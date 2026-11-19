@@ -1,6 +1,7 @@
 ﻿using FastReport.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace FastReport.Barcode
@@ -12,15 +13,18 @@ namespace FastReport.Barcode
     {
         #region private fields
         private Iban iban;
-        private Currency? currency;
+        private string currency;
         private Contact creditor;
         private Reference reference;
         private AdditionalInformation additionalInformation;
         private Contact debitor;
-        private decimal? amount;
+        private string amount;
         private string alternativeProcedure1;
         private string alternativeProcedure2;
         #endregion
+
+        //Pattern extracted from https://qr-validation.iso-payments.ch as explained in https://github.com/codebude/QRCoder/issues/97
+        internal static string charsetPattern = @"^([a-zA-Z0-9\.,;:'\ \+\-/\(\)?\*\[\]\{\}\\`´~ ]|[!""#%&<>÷=@_$£]|[àáâäçèéêëìíîïñòóôöùúûüýßÀÁÂÄÇÈÉÊËÌÍÎÏÒÓÔÖÙÚÛÜÑ])*$";
 
         #region public properties
         /// <summary>
@@ -31,7 +35,7 @@ namespace FastReport.Barcode
         /// <summary>
         /// (either EUR or CHF)
         /// </summary>
-        public Currency? Currency { get { return currency; } set { currency = value; } }
+        public string Currency { get { return currency; } set { currency = value; } }
 
         /// <summary>
         /// Creditor (payee) information
@@ -56,7 +60,7 @@ namespace FastReport.Barcode
         /// <summary>
         /// Amount
         /// </summary>
-        public decimal? Amount { get { return amount; } set { amount = value; } }
+        public string Amount { get { return amount; } set { amount = value; } }
 
         /// <summary>
         /// Optional command for alternative processing mode - line 1
@@ -84,6 +88,10 @@ namespace FastReport.Barcode
             MyRes res = new MyRes("Messages,Swiss");
             if (((unstructuredMessage != null ? unstructuredMessage.Length : 0) + (billInformation != null ? billInformation.Length : 0)) > 140)
                 throw new SwissQrCodeException(res.Get("SwissUnstructBillLength"));
+            if (!Regex.IsMatch(unstructuredMessage, QRSwissParameters.charsetPattern))
+                throw new SwissQrCodeException(String.Format(res.Get("SwissPatternError"), res.Get("SwissPropUnstructuredMessage")) + QRSwissParameters.charsetPattern);
+            if (!Regex.IsMatch(billInformation, QRSwissParameters.charsetPattern))
+                throw new SwissQrCodeException(String.Format(res.Get("SwissPatternError"), res.Get("SwissPropBillInformation")) + QRSwissParameters.charsetPattern);
             this.unstructuredMessage = unstructuredMessage;
             this.billInformation = billInformation;
             this.trailer = "EPD";
@@ -154,17 +162,26 @@ namespace FastReport.Barcode
             this.referenceType = referenceType;
             this.referenceTextType = referenceTextType;
 
-            if (referenceType == ReferenceType.NON && reference != null)
+            if (reference != null && reference.StartsWith("[") && reference.EndsWith("]"))
+            {
+                this.reference = reference;
+                return;
+            }
+
+            string referenceCleaned = reference is null ? null : new string(reference?.Where(c => char.IsLetterOrDigit(c)).ToArray());
+            if (referenceType == ReferenceType.NON && referenceCleaned != null)
                 throw new SwissQrCodeException(res.Get("SwissRefTypeNon"));
-            if (referenceType != ReferenceType.NON && reference != null && referenceTextType == null)
+            if (referenceType != ReferenceType.NON && referenceCleaned == null)
+                throw new SwissQrCodeException(res.Get("SwissRefTypeNotNon"));
+            if (referenceType != ReferenceType.NON && referenceCleaned != null && referenceTextType == null)
                 throw new SwissQrCodeException(res.Get("SwissRefTextTypeNon"));
-            if (referenceTextType == ReferenceTextType.QrReference && reference != null && (reference.Length > 27))
+            if (referenceTextType == ReferenceTextType.QrReference && referenceCleaned != null && (referenceCleaned.Length > 27))
                 throw new SwissQrCodeException(res.Get("SwissRefQRLength"));
-            if (referenceTextType == ReferenceTextType.QrReference && reference != null && !Regex.IsMatch(reference, @"^[0-9]+$"))
+            if (referenceTextType == ReferenceTextType.QrReference && referenceCleaned != null && !Regex.IsMatch(referenceCleaned, @"^[0-9]+$"))
                 throw new SwissQrCodeException(res.Get("SwissRefQRNotOnlyDigits"));
-            if (referenceTextType == ReferenceTextType.QrReference && reference != null && !ChecksumMod10(reference))
+            if (referenceTextType == ReferenceTextType.QrReference && referenceCleaned != null && !ChecksumMod10(referenceCleaned))
                 throw new SwissQrCodeException(res.Get("SwissRefQRCheckSum"));
-            if (referenceTextType == ReferenceTextType.CreditorReferenceIso11649 && reference != null && (reference.Length > 25))
+            if (referenceTextType == ReferenceTextType.CreditorReferenceIso11649 && referenceCleaned != null && (referenceCleaned.Length > 25))
                 throw new SwissQrCodeException(res.Get("SwissRefISOLength"));
 
             this.reference = reference;
@@ -177,13 +194,13 @@ namespace FastReport.Barcode
 
             switch (data[0].Trim())
             {
-                case "QRR":
+                case nameof(ReferenceType.QRR):
                     this.referenceType = ReferenceType.QRR;
                     break;
-                case "SCOR":
+                case nameof(ReferenceType.SCOR):
                     this.referenceType = ReferenceType.SCOR;
                     break;
-                case "NON":
+                case nameof(ReferenceType.NON):
                     this.referenceType = ReferenceType.NON;
                     break;
             }
@@ -210,16 +227,20 @@ namespace FastReport.Barcode
         {
             if (string.IsNullOrEmpty(digits) || digits.Length < 2)
                 return false;
-            int[] mods = new int[] { 0, 9, 4, 6, 8, 2, 7, 1, 3, 5 };
 
+            if (digits.Any(char.IsLetter))
+                return false;
+
+            int[] mods = new int[] { 0, 9, 4, 6, 8, 2, 7, 1, 3, 5 };
+            string digitsClean = digits.Replace(" ", "");
             int remainder = 0;
-            for (int i = 0; i < digits.Length - 1; i++)
+            for (int i = 0; i < digitsClean.Length - 1; i++)
             {
-                int num = Convert.ToInt32(digits[i]) - 48;
+                int num = Convert.ToInt32(digitsClean[i]) - 48;
                 remainder = mods[(num + remainder) % 10];
             }
             int checksum = (10 - remainder) % 10;
-            return checksum == Convert.ToInt32(digits[digits.Length - 1]) - 48;
+            return checksum == Convert.ToInt32(digitsClean[digitsClean.Length - 1]) - 48;
         }
     }
 
@@ -265,65 +286,79 @@ namespace FastReport.Barcode
         {
             twoLetterCodes = ValidTwoLetterCodes();
             MyRes res = new MyRes("Messages,Swiss");
-            MyRes resForms = new MyRes("Forms,BarcodeEditor,Swiss");
-            //Pattern extracted from https://qr-validation.iso-payments.ch as explained in https://github.com/codebude/QRCoder/issues/97
-            string charsetPattern = @"^([a-zA-Z0-9\.,;:'\ \+\-/\(\)?\*\[\]\{\}\\`´~ ]|[!""#%&<>÷=@_$£]|[àáâäçèéêëìíîïñòóôöùúûüýßÀÁÂÄÇÈÉÊËÌÍÎÏÒÓÔÖÙÚÛÜÑ])*$";
 
             this.adrType = addressType;
 
             if (string.IsNullOrEmpty(name))
-                throw new SwissQrCodeContactException(String.Format(res.Get("SwissEmptyProperty"), resForms.Get("Name")));
-            if (name.Length > 70)
-                throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), resForms.Get("Name"), 71));
-            if (!Regex.IsMatch(name, charsetPattern))
-                throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), resForms.Get("Name")) + charsetPattern);
+                throw new SwissQrCodeContactException(String.Format(res.Get("SwissEmptyProperty"), res.Get("SwissPropName")));
+            if (!name.StartsWith("[") || !name.EndsWith("]"))
+            {
+                if (name.Length > 70)
+                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), res.Get("SwissPropName"), 71));
+                if (!Regex.IsMatch(name, QRSwissParameters.charsetPattern))
+                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), res.Get("SwissPropName")) + QRSwissParameters.charsetPattern);
+            }
             this.name = name;
 
             if (AddressType.StructuredAddress == this.adrType)
             {
-                if (!string.IsNullOrEmpty(streetOrAddressline1) && (streetOrAddressline1.Length > 70))
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), resForms.Get("Street"), 71));
-                if (!string.IsNullOrEmpty(streetOrAddressline1) && !Regex.IsMatch(streetOrAddressline1, charsetPattern))
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), resForms.Get("Street")) + charsetPattern);
+                if (!streetOrAddressline1.StartsWith("[") || !streetOrAddressline1.EndsWith("]"))
+                {
+                    if (!string.IsNullOrEmpty(streetOrAddressline1) && (streetOrAddressline1.Length > 70))
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), res.Get("SwissPropStreet"), 71));
+                    if (!string.IsNullOrEmpty(streetOrAddressline1) && !Regex.IsMatch(streetOrAddressline1, QRSwissParameters.charsetPattern))
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), res.Get("SwissPropStreet")) + QRSwissParameters.charsetPattern);
+                }
                 this.streetOrAddressline1 = streetOrAddressline1;
 
-                if (!string.IsNullOrEmpty(houseNumberOrAddressline2) && houseNumberOrAddressline2.Length > 16)
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), resForms.Get("HouseNumber"), 71));
+                if (!houseNumberOrAddressline2.StartsWith("[") || !houseNumberOrAddressline2.EndsWith("]"))
+                {
+                    if (!string.IsNullOrEmpty(houseNumberOrAddressline2) && houseNumberOrAddressline2.Length > 16)
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), res.Get("SwissPropHouseNumber"), 17));
+                    if (!string.IsNullOrEmpty(houseNumberOrAddressline2) && !Regex.IsMatch(houseNumberOrAddressline2, QRSwissParameters.charsetPattern))
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), res.Get("SwissPropStreet")) + QRSwissParameters.charsetPattern);
+                }
                 this.houseNumberOrAddressline2 = houseNumberOrAddressline2;
             }
             else
             {
                 if (!string.IsNullOrEmpty(streetOrAddressline1) && (streetOrAddressline1.Length > 70))
                     throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), "Address line 1", 71));
-                if (!string.IsNullOrEmpty(streetOrAddressline1) && !Regex.IsMatch(streetOrAddressline1, charsetPattern))
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), "Address line 1") + charsetPattern);
+                if (!string.IsNullOrEmpty(streetOrAddressline1) && !Regex.IsMatch(streetOrAddressline1, QRSwissParameters.charsetPattern))
+                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), "Address line 1") + QRSwissParameters.charsetPattern);
                 this.streetOrAddressline1 = streetOrAddressline1;
 
                 if (string.IsNullOrEmpty(houseNumberOrAddressline2))
                     throw new SwissQrCodeContactException(res.Get("SwissAddressLine2Error"));
                 if (!string.IsNullOrEmpty(houseNumberOrAddressline2) && (houseNumberOrAddressline2.Length > 70))
                     throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), "Address line 2", 71));
-                if (!string.IsNullOrEmpty(houseNumberOrAddressline2) && !Regex.IsMatch(houseNumberOrAddressline2, charsetPattern))
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), "Address line 2") + charsetPattern);
+                if (!string.IsNullOrEmpty(houseNumberOrAddressline2) && !Regex.IsMatch(houseNumberOrAddressline2, QRSwissParameters.charsetPattern))
+                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), "Address line 2") + QRSwissParameters.charsetPattern);
                 this.houseNumberOrAddressline2 = houseNumberOrAddressline2;
             }
 
             if (AddressType.StructuredAddress == this.adrType)
             {
-                if (string.IsNullOrEmpty(zipCode))
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissEmptyProperty"), resForms.Get("ZipCode")));
-                if (zipCode.Length > 16)
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), resForms.Get("ZipCode"), 17));
-                if (!Regex.IsMatch(zipCode, charsetPattern))
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), resForms.Get("ZipCode")) + charsetPattern);
+                if (!zipCode.StartsWith("[") || !zipCode.EndsWith("]"))
+                {
+                    if (string.IsNullOrEmpty(zipCode))
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissEmptyProperty"), res.Get("SwissPropZipCode")));
+                    if (zipCode.Length > 16)
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), res.Get("SwissPropZipCode"), 17));
+                    if (!Regex.IsMatch(zipCode, QRSwissParameters.charsetPattern))
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), res.Get("SwissPropZipCode")) + QRSwissParameters.charsetPattern);
+                }
                 this.zipCode = zipCode;
 
-                if (string.IsNullOrEmpty(city))
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissEmptyProperty"), resForms.Get("City")));
-                if (city.Length > 35)
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), resForms.Get("City"), 36));
-                if (!Regex.IsMatch(city, charsetPattern))
-                    throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), resForms.Get("City")) + charsetPattern);
+                if (!city.StartsWith("[") || !city.EndsWith("]"))
+                {
+                    if (string.IsNullOrEmpty(city))
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissEmptyProperty"), res.Get("SwissPropCity")));
+                    if (city.Length > 35)
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissLengthMore"), res.Get("SwissPropCity"), 36));
+                    if (!Regex.IsMatch(city, QRSwissParameters.charsetPattern))
+                        throw new SwissQrCodeContactException(String.Format(res.Get("SwissPatternError"), res.Get("SwissPropCity")) + QRSwissParameters.charsetPattern);
+                }
                 this.city = city;
             }
             else
@@ -331,9 +366,9 @@ namespace FastReport.Barcode
                 this.zipCode = this.city = string.Empty;
             }
 
-            if (!IsValidTwoLetterCode(country))
-                throw new SwissQrCodeContactException(res.Get("SwissCountryTwoLetters"));
-
+            if (!country.StartsWith("[") || !country.EndsWith("]"))
+                if (!IsValidTwoLetterCode(country))
+                    throw new SwissQrCodeContactException(res.Get("SwissCountryTwoLetters"));
             this.country = country;
         }
 
@@ -413,9 +448,9 @@ namespace FastReport.Barcode
     public class Iban
     {
         private string iban;
-        private IbanType? ibanType;
+        private IbanType ibanType;
 
-        public IbanType? TypeIban { get { return ibanType; } set { ibanType = value; } }
+        public IbanType TypeIban { get { return ibanType; } set { ibanType = value; } }
         public string _Iban { get { return iban; } set { iban = value; } }
 
         /// <summary>
@@ -430,8 +465,8 @@ namespace FastReport.Barcode
                 throw new SwissQrCodeException(res.Get("SwissIbanNotValid"));
             if (ibanType == IbanType.QrIban && !IsValidQRIban(iban))
                 throw new SwissQrCodeException(res.Get("SwissQRIbanNotValid"));
-            if (!iban.StartsWith("CH") && !iban.StartsWith("LI"))
-                throw new SwissQrCodeException("SwissQRStartNotValid");
+            if (!iban.StartsWith("CH", StringComparison.OrdinalIgnoreCase) && !iban.StartsWith("LI", StringComparison.OrdinalIgnoreCase))
+                throw new SwissQrCodeException(res.Get("SwissQRStartNotValid"));
             this.iban = iban;
             this.ibanType = ibanType;
         }
@@ -448,7 +483,10 @@ namespace FastReport.Barcode
 
         public override string ToString()
         {
-            return iban.Replace("-", "").Replace("\n", "").Replace(" ", "");
+            if (iban.StartsWith("[") && iban.EndsWith("]"))
+                return iban;
+            else
+                return new string(iban.Where(c => char.IsLetterOrDigit(c)).ToArray()).ToUpper();
         }
 
         public enum IbanType
@@ -460,7 +498,7 @@ namespace FastReport.Barcode
         private bool IsValidIban(string iban)
         {
             //Clean IBAN
-            string ibanCleared = iban.ToUpper().Replace(" ", "").Replace("-", "");
+            string ibanCleared = new string(iban.Where(c => char.IsLetterOrDigit(c)).ToArray()).ToUpper();
 
             //Check for general structure
             bool structurallyValid = Regex.IsMatch(ibanCleared, @"^[a-zA-Z]{2}[0-9]{2}([a-zA-Z0-9]?){16,30}$");
@@ -486,7 +524,7 @@ namespace FastReport.Barcode
             bool foundQrIid = false;
             try
             {
-                string ibanCleared = iban.ToUpper().Replace(" ", "").Replace("-", "");
+                string ibanCleared = new string(iban.Where(c => char.IsLetterOrDigit(c)).ToArray()).ToUpper();
                 int possibleQrIid = Convert.ToInt32(ibanCleared.Substring(4, 5));
                 foundQrIid = possibleQrIid >= 30000 && possibleQrIid <= 31999;
             }

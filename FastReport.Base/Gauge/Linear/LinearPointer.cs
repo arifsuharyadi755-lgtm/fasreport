@@ -8,6 +8,9 @@ namespace FastReport.Gauge.Linear
     /// <summary>
     /// Represents a linear pointer.
     /// </summary>
+#if !DEBUG
+    [DesignTimeVisible(false)]
+#endif
     public class LinearPointer : GaugePointer
     {
         #region Fields
@@ -25,6 +28,7 @@ namespace FastReport.Gauge.Linear
         /// Gets o sets the height of gauge pointer.
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public float Height
         {
             get { return height; }
@@ -35,6 +39,7 @@ namespace FastReport.Gauge.Linear
         /// Gets or sets the width of a pointer.
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public float Width
         {
             get { return width; }
@@ -93,8 +98,7 @@ namespace FastReport.Gauge.Linear
             path.AddLines(p);
             path.AddLine(p[4], p[0]);
 
-            g.FillPath(brush, path);
-            g.DrawPath(pen, path);
+            g.FillAndDrawPath(pen, brush, path);
         }
 
         private void DrawVert(FRPaintEventArgs e)
@@ -131,8 +135,7 @@ namespace FastReport.Gauge.Linear
             path.AddLines(p);
             path.AddLine(p[4], p[0]);
 
-            g.FillPath(brush, path);
-            g.DrawPath(pen, path);
+            g.FillAndDrawPath(pen, brush, path);
         }
 
         #endregion // Private Methods

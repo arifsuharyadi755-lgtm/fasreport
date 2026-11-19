@@ -12,7 +12,7 @@ namespace FastReport.Barcode
     public class BarcodeIntelligentMail : LinearBarcodeBase
     {
         #region LinearBarcodeBase
-        
+
         private bool quietZone;
         const string space = "2";
 
@@ -46,6 +46,12 @@ namespace FastReport.Barcode
             base.Assign(source);
             BarcodeIntelligentMail src = source as BarcodeIntelligentMail;
             QuietZone = src.QuietZone;
+        }
+
+        /// <inheritdoc />
+        public override string GetDefaultValue()
+        {
+            return "12345678901234567890";
         }
 
         internal override void Serialize(FastReport.Utils.FRWriter writer, string prefix, BarcodeBase diff)

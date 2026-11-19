@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace FastReport.Utils
 {
-    
+
     /// <summary>
     /// The reader used to deserialize object's properties from a report file.
     /// </summary>
@@ -87,7 +87,7 @@ namespace FastReport.Utils
 
         private XmlItem GetRoot(XmlItem item, int count)
         {
-            if (count < 0 || item.Parent==null)
+            if (count < 0 || item.Parent == null)
                 return item;
             return GetRoot(item.Parent, count - 1);
 
@@ -258,7 +258,7 @@ namespace FastReport.Utils
                 curRoot = curItem;
                 GetProps();
 
-                if (report != null && report.IsAncestor)
+                if (report != null && (report.IsAncestor || report.HasPageLinks))
                     result = report.FindObject(ReadStr("Name"));
                 if (result == null && curItem.Name != "inherited")
                 {
@@ -361,7 +361,7 @@ namespace FastReport.Utils
                         else if (pi.PropertyType.IsClass && pi.PropertyType.IsSubclassOf(typeof(Base)))
                         {
                             // it's a reference
-                            fixups.Add(new FixupInfo(obj1 as Base, name, value));
+                            fixups.Add(new FixupInfo(obj1, name, value));
                         }
                         else
                         {
@@ -654,11 +654,11 @@ namespace FastReport.Utils
 
         private class FixupInfo
         {
-            public Base obj;
+            public object obj;
             public string name;
             public string value;
 
-            public FixupInfo(Base obj, string name, string value)
+            public FixupInfo(object obj, string name, string value)
             {
                 this.obj = obj;
                 this.name = name;

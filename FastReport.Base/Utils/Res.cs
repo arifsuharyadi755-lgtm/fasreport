@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Reflection;
 using System.Globalization;
 using Microsoft.Win32;
@@ -21,6 +22,7 @@ namespace FastReport.Utils
     public static partial class Res
     {
         private static Dictionary<CultureInfo, XmlDocument> LocalesCache { get; }
+        internal static CultureInfo CurrentCulture { get; private set; }
 
         private static XmlDocument FLocale;
         private static XmlDocument FBuiltinLocale;
@@ -31,12 +33,12 @@ namespace FastReport.Utils
         /// </summary>
         public static string LocaleFolder
         {
-            get 
+            get
             {
                 Report.EnsureInit();
                 string folder = Config.Root.FindItem("Language").GetProp("Folder");
                 // check the registry
-#if !(NETSTANDARD2_0 || NETSTANDARD2_1)
+#if !CROSSPLATFORM
                 if (String.IsNullOrEmpty(folder) && !Config.WebMode)
                 {
                     RegistryKey key = Registry.CurrentUser.OpenSubKey("Software").OpenSubKey("FastReports");
@@ -54,7 +56,8 @@ namespace FastReport.Utils
 
                 return folder;
             }
-            set { 
+            set
+            {
                 Config.Root.FindItem("Language").SetProp("Folder", value);
             }
         }
@@ -64,9 +67,9 @@ namespace FastReport.Utils
         /// </summary>
         public static string LocaleName
         {
-            get 
+            get
             {
-                return FLocale.Root.GetProp("Name"); 
+                return FLocale.Root.GetProp("Name");
             }
         }
 
@@ -83,9 +86,30 @@ namespace FastReport.Utils
             using (Stream stream = ResourceLoader.GetStream("en.xml"))
             {
                 FLocale.Load(stream);
-                CultureInfo enCulture = CultureInfo.GetCultureInfo("en");
+                CultureInfo enCulture;
+                try
+                {
+                    enCulture = CultureInfo.GetCultureInfo("en");
+                }
+                catch   // InvariantGlobalization mod fix (#939)
+                {
+                    enCulture = CultureInfo.InvariantCulture;
+                }
+                CurrentCulture = enCulture;
                 if (!LocalesCache.ContainsKey(enCulture))
                     LocalesCache.Add(enCulture, FLocale);
+            }
+        }
+
+        private static void SetCurrentCulture()
+        {
+            try
+            {
+                CurrentCulture = CultureInfo.GetCultureInfo(LocaleName);
+            }
+            catch
+            {
+
             }
         }
 
@@ -101,9 +125,10 @@ namespace FastReport.Utils
             {
                 FLocale = new XmlDocument();
                 FLocale.Load(fileName);
+                SetCurrentCulture();
             }
             else
-                FLocale = FBuiltinLocale;
+                LoadEnglishLocale();
         }
 
         /// <summary>
@@ -116,12 +141,14 @@ namespace FastReport.Utils
         {
             if (culture == CultureInfo.InvariantCulture)
             {
+                CurrentCulture = culture;
                 FLocale = FBuiltinLocale;
                 return;
             }
 
             if (LocalesCache.ContainsKey(culture))
             {
+                CurrentCulture = culture;
                 FLocale = LocalesCache[culture];
                 return;
             }
@@ -132,6 +159,7 @@ namespace FastReport.Utils
             {
                 if (LocalesCache.ContainsKey(parent))
                 {
+                    CurrentCulture = parent;
                     FLocale = LocalesCache[parent];
                     return;
                 }
@@ -140,6 +168,7 @@ namespace FastReport.Utils
                 if (parent.Parent != CultureInfo.InvariantCulture)
                     if (LocalesCache.ContainsKey(parent.Parent))
                     {
+                        CurrentCulture = parent.Parent;
                         FLocale = LocalesCache[parent.Parent];
                         return;
                     }
@@ -169,6 +198,7 @@ namespace FastReport.Utils
 
                 var newLocale = new XmlDocument();
                 newLocale.Load(localeFile);
+                CurrentCulture = culture;
                 FLocale = newLocale;
                 LocalesCache.Add(culture, newLocale);
             }
@@ -207,6 +237,8 @@ namespace FastReport.Utils
 
             FLocale = new XmlDocument();
             FLocale.Load(stream);
+
+            SetCurrentCulture();
         }
 
         /// <summary>
@@ -214,27 +246,28 @@ namespace FastReport.Utils
         /// </summary>
         public static void LoadEnglishLocale()
         {
+            CurrentCulture = CultureInfo.GetCultureInfo("en");
             FLocale = FBuiltinLocale;
         }
-    
-    internal static void LoadDefaultLocale()
-    {
-      if (!Directory.Exists(LocaleFolder))
-        return;
-        
-      if (String.IsNullOrEmpty(DefaultLocaleName))
-      {
-            // locale is set to "Auto"
-            CultureInfo currentCulture = CultureInfo.CurrentCulture;
 
-            LoadLocale(currentCulture);
-      }
-      else
-      {
-        // locale is set to specific name
-        LoadLocale(Path.Combine(LocaleFolder, DefaultLocaleName + ".frl"));
-      }
-    }
+        internal static void LoadDefaultLocale()
+        {
+            if (!Directory.Exists(LocaleFolder))
+                return;
+
+            if (String.IsNullOrEmpty(DefaultLocaleName))
+            {
+                // locale is set to "Auto"
+                CultureInfo currentCulture = CultureInfo.CurrentCulture;
+
+                LoadLocale(currentCulture);
+            }
+            else
+            {
+                // locale is set to specific name
+                LoadLocale(Path.Combine(LocaleFolder, DefaultLocaleName + ".frl"));
+            }
+        }
 
         /// <summary>
         /// Gets a string with specified ID.
@@ -259,15 +292,15 @@ namespace FastReport.Utils
         {
             string result = Get(id, FLocale);
             // if no item found, try built-in (english) locale
-            if(string.IsNullOrEmpty(result))
+            if (string.IsNullOrEmpty(result))
             {
-                if(FLocale != FBuiltinLocale)
+                if (FLocale != FBuiltinLocale)
                 {
                     result = Get(id, FBuiltinLocale);
                     if (string.IsNullOrEmpty(result))
                         result = id + " " + FBadResult;
                 }
-                else                  
+                else
                     result = id + " " + FBadResult;
             }
             return result;
@@ -275,7 +308,7 @@ namespace FastReport.Utils
 
         private static string Get(string id, XmlDocument locale)
         {
-            string[] categories = id.Split(new char[] { ',' });
+            string[] categories = id.Split(',');
             XmlItem xi = locale.Root;
             foreach (string category in categories)
             {
@@ -313,7 +346,7 @@ namespace FastReport.Utils
         /// </example>
         public static void Set(string id, string value)
         {
-            string[] categories = id.Split(new char[] { ',' });
+            string[] categories = id.Split(',');
             XmlItem xi = FLocale.Root;
             foreach (string category in categories)
             {
@@ -333,9 +366,9 @@ namespace FastReport.Utils
             string result = Get(id);
             if (result.IndexOf(FBadResult) != -1)
                 result = id;
-            return result;  
+            return result;
         }
-    
+
         /// <summary>
         /// Tries to get builtin string with specified ID.
         /// </summary>
@@ -346,7 +379,7 @@ namespace FastReport.Utils
             string result = GetBuiltin(id);
             if (string.IsNullOrEmpty(result))
                 result = id;
-            return result;  
+            return result;
         }
 
         /// <summary>
@@ -368,73 +401,73 @@ namespace FastReport.Utils
 
         static partial void ResDesignExt();
     }
-  
-  /// <summary>
-  /// Used to access to resource IDs inside the specified branch.
-  /// </summary>
-  /// <remarks>
-  /// Using the <see cref="Res.Get(string)"/> method, you have to specify the full path to your resource.
-  /// Using this class, you can shorten the path:
-  /// <code>
-  /// // using the Res.Get method
-  /// miKeepTogether = new ToolStripMenuItem(Res.Get("ComponentMenu,HeaderBand,KeepTogether"));
-  /// miResetPageNumber = new ToolStripMenuItem(Res.Get("ComponentMenu,HeaderBand,ResetPageNumber"));
-  /// miRepeatOnEveryPage = new ToolStripMenuItem(Res.Get("ComponentMenu,HeaderBand,RepeatOnEveryPage"));
-  /// 
-  /// // using MyRes.Get method
-  /// MyRes res = new MyRes("ComponentMenu,HeaderBand");
-  /// miKeepTogether = new ToolStripMenuItem(res.Get("KeepTogether"));
-  /// miResetPageNumber = new ToolStripMenuItem(res.Get("ResetPageNumber"));
-  /// miRepeatOnEveryPage = new ToolStripMenuItem(res.Get("RepeatOnEveryPage"));
-  /// 
-  /// </code>
-  /// </remarks>
-  public class MyRes
-  {
-    private string category;
 
     /// <summary>
-    /// Gets a string with specified ID inside the main branch.
+    /// Used to access to resource IDs inside the specified branch.
     /// </summary>
-    /// <param name="id">The resource ID.</param>
-    /// <returns>The localized value.</returns>
-    public string Get(string id)
+    /// <remarks>
+    /// Using the <see cref="Res.Get(string)"/> method, you have to specify the full path to your resource.
+    /// Using this class, you can shorten the path:
+    /// <code>
+    /// // using the Res.Get method
+    /// miKeepTogether = new ToolStripMenuItem(Res.Get("ComponentMenu,HeaderBand,KeepTogether"));
+    /// miResetPageNumber = new ToolStripMenuItem(Res.Get("ComponentMenu,HeaderBand,ResetPageNumber"));
+    /// miRepeatOnEveryPage = new ToolStripMenuItem(Res.Get("ComponentMenu,HeaderBand,RepeatOnEveryPage"));
+    /// 
+    /// // using MyRes.Get method
+    /// MyRes res = new MyRes("ComponentMenu,HeaderBand");
+    /// miKeepTogether = new ToolStripMenuItem(res.Get("KeepTogether"));
+    /// miResetPageNumber = new ToolStripMenuItem(res.Get("ResetPageNumber"));
+    /// miRepeatOnEveryPage = new ToolStripMenuItem(res.Get("RepeatOnEveryPage"));
+    /// 
+    /// </code>
+    /// </remarks>
+    public class MyRes
     {
-      if (id != "")
-        return Res.Get(category + "," + id);
-      else
-        return Res.Get(category);
-    }
+        private string category;
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="MyRes"/> class with spevified branch.
-    /// </summary>
-    /// <param name="category">The main resource branch.</param>
-    public MyRes(string category)
-    {
+        /// <summary>
+        /// Gets a string with specified ID inside the main branch.
+        /// </summary>
+        /// <param name="id">The resource ID.</param>
+        /// <returns>The localized value.</returns>
+        public string Get(string id)
+        {
+            if (id != "")
+                return Res.Get(category + "," + id);
+            else
+                return Res.Get(category);
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MyRes"/> class with spevified branch.
+        /// </summary>
+        /// <param name="category">The main resource branch.</param>
+        public MyRes(string category)
+        {
             this.category = category;
+        }
     }
-  }
 
-  
-  /// <summary>
-  /// Localized CategoryAttribute class.
-  /// </summary>
-  public class SRCategory : CategoryAttribute
-  {
-    /// <inheritdoc/>
-    protected override string GetLocalizedString(string value)
-    {
-      return Res.TryGet("Properties,Categories," + value);
-    }
 
     /// <summary>
-    /// Initializes a new instance of the SRCategory class.
+    /// Localized CategoryAttribute class.
     /// </summary>
-    /// <param name="value">The category name.</param>
-    public SRCategory(string value)
-      : base(value)
+    public class SRCategory : CategoryAttribute
     {
+        /// <inheritdoc/>
+        protected override string GetLocalizedString(string value)
+        {
+            return Res.TryGet("Properties,Categories," + value);
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the SRCategory class.
+        /// </summary>
+        /// <param name="value">The category name.</param>
+        public SRCategory(string value)
+          : base(value)
+        {
+        }
     }
-  }
 }

@@ -108,6 +108,7 @@
     </Shapes>
     <PictureObject Text="Imagen"/>
     <TableObject Text="Tabla"/>
+    <Matrix Text="Tabla Cruzada"/>
     <MatrixObject Text="Tabla Cruzada"/>
     <SubreportObject Text="Subinforme"/>
     <BarcodeObject Text="Código de barras"/>
@@ -156,7 +157,7 @@
     <MdbFile Text="MS Access database (*.mdb)|*.mdb"/>
     <MdfFile Text="Microsoft SQL Server databases (*.mdf)|*.mdf"/>
     <RtfFile Text="Archivo Rich Text(Word) (*.rtf)|*.rtf"/>
-    <Images Text="Archivo Imágenes|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Archivo Imágenes|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Compilados (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="Impresoras (*.prn)|*.prn"/>
     <BmpFile Text="Imagen Bitmap (*.bmp)|*.bmp"/>
@@ -1602,7 +1603,7 @@
       <InsertToRight Text="Ingresar Columna a la derecha"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Combiar celdas"/>
+      <Merge Text="Combiar celdas"/>
       <Split Text="Combinar Celdas"/>
     </TableCell>
     <MatrixObject>
@@ -1759,14 +1760,14 @@
     <Ods Text="Exportar a Open Office Calc">
       <File Text="OpenOffice Calc..."/>
     </Ods>
-    <Xlsx Text="Exportar a Excel 2007">
-      <File Text="Archivo Excel 2007..."/>
+    <Xlsx Text="Exportar a Microsoft Excel">
+      <File Text="Archivo Microsoft Excel"/>
     </Xlsx>
-    <Pptx Text="Exportar a PowerPoint 2007">
-      <File Text="Archivo PowerPoint 2007"/>
+    <Pptx Text="Exportar a Microsoft PowerPoint">
+      <File Text="Archivo Microsoft PowerPoint"/>
     </Pptx>
-    <Docx Text="Exportar a Microsoft Word 2007">
-      <File Text="Archivo Microsoft Word 2007"/>
+    <Docx Text="Exportar a Microsoft Word">
+      <File Text="Archivo Microsoft Word"/>
     </Docx>
     <Xps Text="Exportar a XPS">
       <File Text="Microsoft XPS file"/>

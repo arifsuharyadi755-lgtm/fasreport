@@ -34,10 +34,12 @@ namespace FastReport
             // data items
             RegisteredObjects.InternalAdd(typeof(Column), "", 0);
             RegisteredObjects.InternalAdd(typeof(CommandParameter), "", 0);
+            RegisteredObjects.InternalAdd(typeof(ProcedureParameter), "", 0);
             RegisteredObjects.InternalAdd(typeof(Relation), "", 0);
             RegisteredObjects.InternalAdd(typeof(Parameter), "", 0);
             RegisteredObjects.InternalAdd(typeof(Total), "", 0);
             RegisteredObjects.InternalAdd(typeof(TableDataSource), "", 0);
+            RegisteredObjects.InternalAdd(typeof(ProcedureDataSource), "", 0);
             RegisteredObjects.InternalAdd(typeof(ViewDataSource), "", 0);
             RegisteredObjects.InternalAdd(typeof(BusinessObjectDataSource), "", 0);
             RegisteredObjects.InternalAdd(typeof(SliceCubeSource), "", 0);
@@ -50,7 +52,6 @@ namespace FastReport
             //RegisteredObjects.Add(typeof(Data.JsonConnection.JsonObjectDataSource), "", 0);
             //RegisteredObjects.Add(typeof(Data.JsonConnection.JsonArrayDataSource), "", 0);
             RegisteredObjects.InternalAddConnection(typeof(Data.JsonConnection.JsonDataSourceConnection));
-            RegisteredObjects.InternalAddConnection(typeof(Data.ElasticSearch.ESDataSourceConnection));
             // formats
             RegisteredObjects.InternalAdd(typeof(BooleanFormat), "", 0);
             RegisteredObjects.InternalAdd(typeof(CurrencyFormat), "", 0);
@@ -87,7 +88,6 @@ namespace FastReport
             RegisteredObjects.Add(typeof(LineObject), "ReportPage,Shapes", 150, "Objects,Shapes,DiagonalLine", 2, true);
             RegisteredObjects.Add(typeof(LineObject), "ReportPage,Shapes", 151, "Objects,Shapes,DiagonalLine", 3, true);
             RegisteredObjects.Add(typeof(LineObject), "ReportPage,Shapes", 152, "Objects,Shapes,DiagonalLine", 4, true);
-            //RegisteredObjects.Add(typeof(BezierObject), "ReportPage,Shapes", 239, "Objects,Shapes,Bezier", 5, true);
             RegisteredObjects.Add(typeof(ShapeObject), "ReportPage,Shapes", 108, "Objects,Shapes,Rectangle", 0);
             RegisteredObjects.Add(typeof(ShapeObject), "ReportPage,Shapes", 109, "Objects,Shapes,RoundRectangle", 1);
             RegisteredObjects.Add(typeof(ShapeObject), "ReportPage,Shapes", 110, "Objects,Shapes,Ellipse", 2);
@@ -106,15 +106,29 @@ namespace FastReport
             RegisteredObjects.InternalAdd(typeof(TableColumn), "", 215);
             RegisteredObjects.InternalAdd(typeof(TableRow), "", 216);
             RegisteredObjects.InternalAdd(typeof(TableCell), "", 214);
-            RegisteredObjects.InternalAdd(typeof(MatrixObject), "ReportPage", 142, 7);
 
 #if !COMMUNITY
-            RegisteredObjects.InternalAdd(typeof(CrossViewObject), "ReportPage", 247, 8);
+            RegisteredObjects.AddCategory("ReportPage,Matrix", 142, 7, "Objects,Matrix");
+            RegisteredObjects.InternalAdd(typeof(MatrixObject), "ReportPage,Matrix", 142, 1);
+#if !(WPF || AVALONIA)
+            RegisteredObjects.InternalAdd(typeof(CrossViewObject), "ReportPage,Matrix", 247, 2);
+#endif
+#else
+            RegisteredObjects.InternalAdd(typeof(MatrixObject), "ReportPage", 142, 7);
 #endif
 
+
             RegisteredObjects.AddCategory("ReportPage,Barcodes", 123, 9, "Objects,BarcodeObject");
+            RegisteredObjects.AddCategory("ReportPage,Barcodes,2D", 149, 9, "Objects,BarcodeObject,TwoD");
+            RegisteredObjects.AddCategory("ReportPage,Barcodes,EANUPC", 123, 9, "Objects,BarcodeObject,EANUPC");
+            RegisteredObjects.AddCategory("ReportPage,Barcodes,Post", 123, 9, "Objects,BarcodeObject,Post");
+            RegisteredObjects.AddCategory("ReportPage,Barcodes,GS1", 123, 9, "Objects,BarcodeObject,GS1");
+            RegisteredObjects.AddCategory("ReportPage,Barcodes,Others", 123, 9, "Objects,BarcodeObject,Others");
             for (int i = 0; i <= Barcodes.Items.Length - 1; i++)
-                RegisteredObjects.Add(typeof(BarcodeObject), "ReportPage,Barcodes", 123, Barcodes.Items[i].barcodeName, i);
+            {
+                var barcode = Barcodes.Items[i];
+                RegisteredObjects.Add(typeof(BarcodeObject), "ReportPage,Barcodes," + barcode.category, barcode.category == "2D" ? 149 : 123, barcode.barcodeName, i);
+            }
 
             RegisteredObjects.InternalAdd(typeof(CheckBoxObject), "ReportPage", 124, 10);
             RegisteredObjects.InternalAdd(typeof(ZipCodeObject), "ReportPage", 129, 14);
@@ -127,14 +141,13 @@ namespace FastReport
             RegisteredObjects.Add(typeof(SimpleProgressGauge), "ReportPage,Gauge", 140, "Objects,Gauge,SimpleProgress", 0, false);
 
             RegisteredObjects.InternalAdd(typeof(HtmlObject), "ReportPage", 246, 18);
+            RegisteredObjects.InternalAdd(typeof(RFIDLabel), "ReportPage", 265, 19);
 
             // exports
             RegisteredObjects.InternalAddExport(typeof(ImageExport), "Image", "Export,Image,File");
 
             // functions
-            RegisteredObjects.AddCategory("Functions", -1, "");
             StdFunctions.Register();
-
 
         }
     }

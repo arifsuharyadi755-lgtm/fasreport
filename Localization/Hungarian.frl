@@ -108,6 +108,7 @@
     </Shapes>
     <PictureObject Text="Kép"/>
     <TableObject Text="Táblázat"/>
+    <Matrix Text="Mátrix"/>
     <MatrixObject Text="Mátrix"/>
     <SubreportObject Text="Alriport"/>
     <BarcodeObject Text="Vonalkód"/>
@@ -156,7 +157,7 @@
     <MdbFile Text="MS Access adatbázis(*.mdb)|*.mdb"/>
     <MdfFile Text="Microsoft SQL Server adatbázis (*.mdf)|*.mdf"/>
     <RtfFile Text="Rich Text fájl (*.rtf)|*.rtf"/>
-    <Images Text="Kép fájlok|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Kép fájlok|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Kompilálás (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="Nyomtató fájl (*.prn)|*.prn"/>
     <BmpFile Text="Bitmap kép (*.bmp)|*.bmp"/>
@@ -189,17 +190,17 @@
     <RptFile Text="Crystal Riport fájlok (*.rpt)|*.rpt"/>
   </FileFilters>
   <Formats>
-    <Date1 Text="n"/>
-    <Date2 Text="N"/>
+    <Date1 Text="d"/>
+    <Date2 Text="D"/>
     <Date3 Text="f"/>
     <Date4 Text="F"/>
-    <Date5 Text="HH/nn/ee"/>
-    <Date6 Text="HHHH nn, eeee"/>
-    <Date7 Text="HHHH eeee"/>
-    <Time1 Text="i"/>
-    <Time2 Text="I"/>
-    <Time3 Text="oo:pp tt"/>
-    <Time4 Text="OO:pp"/>
+    <Date5 Text="MM/dd/yy"/>
+    <Date6 Text="MMMM dd, yyyy"/>
+    <Date7 Text="MMMM yyyy"/>
+    <Time1 Text="t"/>
+    <Time2 Text="T"/>
+    <Time3 Text="hh:mm tt"/>
+    <Time4 Text="HH:mm"/>
     <BooleanF1 Text="Hamis"/>
     <BooleanF2 Text="Nem"/>
     <BooleanF3 Text="Kikapcsol"/>
@@ -1500,7 +1501,7 @@
       <InsertToRight Text="Oszlop Beszurás Jobbra"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Cellák Összevonása"/>
+      <Merge Text="Cellák Összevonása"/>
       <Split Text="Cellák Felosztása"/>
     </TableCell>
     <MatrixObject>
@@ -1657,14 +1658,14 @@
     <Ods Text="Exportál Open Office Calc-ba">
       <File Text="OpenOffice Calc"/>
     </Ods>
-    <Xlsx Text="Exportál Excel 2007-be">
-      <File Text="Excel 2007 fájl"/>
+    <Xlsx Text="Exportál Microsoft Excel">
+      <File Text="Microsoft Excel fájl"/>
     </Xlsx>
-    <Pptx Text="Exportál PowerPoint 2007-be">
-      <File Text="PowerPoint 2007 fájl"/>
+    <Pptx Text="Exportál Microsoft PowerPoint">
+      <File Text="Microsoft PowerPoint fájl"/>
     </Pptx>
-    <Docx Text="Exportál Microsoft Word 2007-be">
-      <File Text="Microsoft Word 2007 fájl"/>
+    <Docx Text="Exportál Microsoft Word">
+      <File Text="Microsoft Word fájl"/>
     </Docx>
     <Xps Text="Exportál XPS-be">
       <File Text="Microsoft XPS fájl"/>

@@ -1,3 +1,5 @@
+#undef FRCORE
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -81,7 +83,7 @@ namespace FastReport.Data
         {
             using (OpenFileDialog dlg = new OpenFileDialog())
             {
-                dlg.Filter = "*.db3|*.db3|*.*|*.*";
+                dlg.Filter = "*.db;*.db3|*.db;*.db3|*.*|*.*";
                 if (dlg.ShowDialog() == DialogResult.OK)
                     tbDataSource.Text = dlg.FileName;
             }

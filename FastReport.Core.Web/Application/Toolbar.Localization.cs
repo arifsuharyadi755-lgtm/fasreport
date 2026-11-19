@@ -52,6 +52,14 @@ namespace FastReport.Web
 
         internal readonly string zoomTxt;
 
+        internal readonly string searchTxt;
+        internal readonly string searchPlaceholder;
+        internal readonly string matchCase;
+        internal readonly string wholeWord;
+        internal readonly string searchNext;
+        internal readonly string searchPrev;
+        internal readonly string searchNotFound;
+
         /// <summary>
         /// Default toolbar localization
         /// </summary>
@@ -76,11 +84,11 @@ namespace FastReport.Web
             csvTxt = "CSV file";
             dxfTxt = "DXF file";
             excel97Txt = "MS Office Excel 97-2003";
-            //emailTxt = "Email"; // Required modal window
+            emailTxt = "Email"; // Required modal window
             hpglTxt = "HPGL";
             htmlTxt = "HTML";
             svgTxt = "SVG";
-            //imageTxt = "Image"; // Required modal window
+            imageTxt = "Image"; // Required modal window
             jsonTxt = "Json";
             ppmlTxt = "PPML";
             latexTxt = "Latex";
@@ -99,6 +107,13 @@ namespace FastReport.Web
             printFromPdf = "Print from PDF viewer";
 
             zoomTxt = "Zoom";
+            searchTxt = "Search";
+            searchPlaceholder = "Enter the text";
+            matchCase = "Match case";
+            wholeWord = "Whole word";
+            searchNext = "Search next";
+            searchPrev = "Search prev";
+            searchNotFound = "Not found";
         }
 
         /// <summary>
@@ -121,6 +136,14 @@ namespace FastReport.Web
             previousPageTxt = Res.Get("Prev");
             nextPageTxt = Res.Get("Next");
             lastPageTxt = Res.Get("Last");
+
+            searchTxt = Res.Get("Search");
+            searchPlaceholder = Res.Get("SearchPlaceholder");
+            matchCase = Res.Get("MatchCase");
+            wholeWord = Res.Get("WholeWord");
+            searchNext = Res.Get("SearchNext");
+            searchPrev = Res.Get("SearchPrev");
+            searchNotFound = Res.Get("SearchNotFound");
 
             printFromBrowserTxt = Res.Get("PrintFromBrowser");
             printFromPdf = Res.Get("PrintFromAcrobat");
@@ -156,8 +179,8 @@ namespace FastReport.Web
             xamlTxt = Res.Get("Xaml");
             zplTxt = Res.Get("Zpl");
             mhtTxt = Res.Get("Mht");
-            //emailTxt = Res.Get("Email"); // Required modal window
-            //imageTxt = Res.Get("Image"); // Required modal window
+            emailTxt = Res.Get("Email"); // Required modal window
+            imageTxt = Res.Get("Image");
         }
 
     }

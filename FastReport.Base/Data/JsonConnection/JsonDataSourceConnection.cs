@@ -1,4 +1,4 @@
-﻿using FastReport.Data.JsonConnection.JsonParser;
+﻿using FastReport.Utils.Json;
 using System;
 using System.Data;
 using System.Data.Common;
@@ -12,7 +12,7 @@ namespace FastReport.Data.JsonConnection
     /// <summary>
     /// FastReport json connection
     /// </summary>
-    public partial class JsonDataSourceConnection : DataConnectionBase
+    public partial class JsonDataSourceConnection : DataConnectionBase, IJsonProviderSourceConnection
     {
         #region Public Fields
 
@@ -28,6 +28,7 @@ namespace FastReport.Data.JsonConnection
         private JsonArray jsonInternal = null;
         private JsonSchema jsonSchema = null;
         private string jsonSchemaString = "";
+        private bool simpleStructure;
 
         #endregion Private Fields
 
@@ -50,6 +51,14 @@ namespace FastReport.Data.JsonConnection
                 if (jsonSchema == null)
                     InitConnection();
                 return jsonSchema;
+            }
+        }
+
+        internal bool SimpleStructure
+        {
+            get
+            {
+                return simpleStructure;
             }
         }
 
@@ -153,6 +162,12 @@ namespace FastReport.Data.JsonConnection
             return value;
         }
 
+        /// <inheritdoc/>
+        public JsonBase GetJson(TableDataSource tableDataSource)
+        {
+            return Json;
+        }
+
         #endregion Public Methods
 
         #region Protected Methods
@@ -182,6 +197,7 @@ namespace FastReport.Data.JsonConnection
         private void InitConnection(bool rebuildSchema)
         {
             JsonDataSourceConnectionStringBuilder builder = new JsonDataSourceConnectionStringBuilder(ConnectionString);
+            simpleStructure = builder.SimpleStructure;
             JsonBase obj = null;
             string jsonText = builder.Json.Trim();
             if (jsonText.Length > 0)
@@ -203,7 +219,8 @@ namespace FastReport.Data.JsonConnection
 
                     ServicePointManager.Expect100Continue = true;
                     ServicePointManager.SecurityProtocol = (SecurityProtocolType)(0xc0 | 0x300 | 0xc00);
-                    HttpWebRequest req = (HttpWebRequest)WebRequest.Create(jsonText);
+                    var req = WebRequest.Create(jsonText);
+                    req.Timeout = CommandTimeout * 1000;
 
                     foreach (var header in builder.Headers)
                     {
@@ -212,7 +229,20 @@ namespace FastReport.Data.JsonConnection
 
                     using (var response = req.GetResponse() as HttpWebResponse)
                     {
-                        var encoding = Encoding.GetEncoding(response.CharacterSet);
+                        Encoding encoding = Encoding.UTF8;
+
+                        try
+                        {
+                            encoding = Encoding.GetEncoding(response.CharacterSet);
+                        }
+                        catch
+                        {
+                            try
+                            {
+                                encoding = Encoding.GetEncoding(builder.Encoding);
+                            }
+                            catch { }
+                        }
 
                         using (var responseStream = response.GetResponseStream())
                         using (var reader = new System.IO.StreamReader(responseStream, encoding))
@@ -274,6 +304,8 @@ namespace FastReport.Data.JsonConnection
                 jsonInternal = result;
             }
         }
+
+
 
         #endregion Private Methods
     }

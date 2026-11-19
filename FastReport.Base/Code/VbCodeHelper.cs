@@ -3,13 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
-#if NETSTANDARD || NETCOREAPP
-using FastReport.Code.CodeDom.Compiler;
-using FastReport.Code.VisualBasic;
-#else
-using System.CodeDom.Compiler;
-using Microsoft.VisualBasic;
-#endif
 using FastReport.Utils;
 using FastReport.Data;
 
@@ -77,12 +70,27 @@ namespace FastReport.Code
         #region Public Methods
         public override string EmptyScript()
         {
-            return "Imports System\r\nImports System.Collections\r\nImports System.Collections.Generic\r\n" +
-              "Imports System.ComponentModel\r\nImports System.Windows.Forms\r\nImports System.Drawing\r\n" +
-              "Imports Microsoft.VisualBasic\r\n" +
-              "Imports FastReport\r\nImports FastReport.Data\r\nImports FastReport.Dialog\r\nImports FastReport.Table\r\n" +
-              "Imports FastReport.Barcode\r\nImports FastReport.Utils\r\n\r\nNamespace FastReport\r\n" +
-              "  Public Class ReportScript\r\n\r\n  End Class\r\nEnd Namespace\r\n";
+            return
+@"Imports System
+Imports System.Collections
+Imports System.Collections.Generic
+Imports System.ComponentModel
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports Microsoft.VisualBasic
+Imports FastReport
+Imports FastReport.Data
+Imports FastReport.Dialog
+Imports FastReport.Table
+Imports FastReport.Barcode
+Imports FastReport.Utils
+
+Namespace FastReport
+  Public Class ReportScript
+
+  End Class
+End Namespace
+";
         }
 
         public override int GetPositionToInsertOwnItems(string scriptText)
@@ -305,10 +313,14 @@ namespace FastReport.Code
             return result;
         }
 
-        public override CodeDomProvider GetCodeProvider()
+        public override string GetPropertySignature(PropertyInfo info, bool fullForm)
         {
-            return new VBCodeProvider();
+            string result = GetEquivalentKeyword(info.PropertyType.Name) + " " + info.Name;
+            if (fullForm)
+                result += " { <font color=\"Blue\"> get;" + (info.CanWrite ? " set;" : "") + "</font> }";
+            return result;
         }
+
         #endregion
 
         public VbCodeHelper(Report report) : base(report)

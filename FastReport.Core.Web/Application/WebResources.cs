@@ -6,7 +6,7 @@ using System.Text;
 
 namespace FastReport.Web.Application
 {
-    internal interface IWebRes
+    internal interface IWebRes : IDisposable
     {
         void LoadLocale(string fileName);
 
@@ -14,10 +14,12 @@ namespace FastReport.Web.Application
 
         string Get(string id);
 
-        void Root(string Section);
+        string GetInternal(string id);
+
+        void Root(string section);
     }
 
-    internal class WebRes : IWebRes
+    internal sealed class WebRes : IWebRes
     {
         //private XmlItem root;
         private string[] categories;
@@ -58,6 +60,11 @@ namespace FastReport.Web.Application
             return result;
         }
 
+        public string GetInternal(string id)
+        {
+            return Get(id, locale);
+        }
+
         private string Get(string id, XmlDocument locale)
         {
             XmlItem xi = locale.Root;
@@ -71,25 +78,34 @@ namespace FastReport.Web.Application
             }
 
             // find 'id'
-            i = xi.Find(id);
-            if (i == -1)
-                return null;
-            xi = xi[i];
+            if(!string.IsNullOrEmpty(id))
+            {
+                i = xi.Find(id);
+                if (i == -1)
+                    return null;
+                xi = xi[i];
+            }
 
             return xi.GetProp("Text");
         }
 
 
-        public void Root(string Section)
+        public void Root(string section)
         {
-            categories = Section.Split(',');
+            categories = section.Split(',');
         }
 
-        public WebRes(string Section = "")
+        public void Dispose()
+        {
+            if (locale != builtinLocale)
+                locale.Dispose();
+        }
+
+        public WebRes(string section = "")
         {
             locale = builtinLocale;
-
-            Root(Section);
+             
+            Root(section);
         }
 
         static WebRes()

@@ -100,23 +100,25 @@ namespace FastReport.Data
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
             WebRequest request;
             WebResponse response = null;
+            Uri uri = new Uri(builder.CsvFile);
 
             try
             {
                 // fix for datafile in current folder
                 if (File.Exists(builder.CsvFile))
+                {
                     builder.CsvFile = Path.GetFullPath(builder.CsvFile);
 
-                Uri uri = new Uri(builder.CsvFile);
-
-                if (uri.IsFile)
-                {
-                    if (Config.ForbidLocalData)
-                        throw new Exception(Res.Get("ConnectionEditors,Common,OnlyUrlException"));
-                    request = (FileWebRequest)WebRequest.Create(uri);
-                    request.Timeout = 5000;
-                    response = (FileWebResponse)request.GetResponse();
+                    if (uri.IsFile)
+                    {
+                        if (Config.ForbidLocalData)
+                            throw new Exception(Res.Get("ConnectionEditors,Common,OnlyUrlException"));
+                        request = (FileWebRequest)WebRequest.Create(uri);
+                        request.Timeout = 5000;
+                        response = (FileWebResponse)request.GetResponse();
+                    }
                 }
+
                 else if (uri.OriginalString.StartsWith("http"))
                 {
                     request = (HttpWebRequest)WebRequest.Create(uri);
@@ -129,7 +131,17 @@ namespace FastReport.Data
                     request.Timeout = 5000;
                     response = (FtpWebResponse)request.GetResponse();
                 }
+                else
+                {
+                    throw new NullReferenceException(Res.Get("ConnectionEditors,Common,ErrorUrlException"));
+                }
             }
+
+            catch (NullReferenceException ex)
+            {
+                throw ex;
+            }
+
             catch (Exception e)
             {
                 throw e;
@@ -143,7 +155,13 @@ namespace FastReport.Data
                 maxLines = int.MaxValue;
 
             // read lines
-            using (StreamReader reader = new StreamReader(response.GetResponseStream(), Encoding.GetEncoding(builder.Codepage)))
+            Encoding encoding;
+#if !NETFRAMEWORK
+            encoding = CodePagesEncodingProvider.Instance.GetEncoding(builder.Codepage);
+#else
+            encoding = Encoding.GetEncoding(builder.Codepage);
+#endif
+            using (StreamReader reader = new StreamReader(response.GetResponseStream(), encoding))
             {
                 for (int i = 0; i < maxLines; i++)
                 {

@@ -91,15 +91,16 @@
       <DiagonalLine Text="Linea diagonale"/>
       <Rectangle Text="Rettangolo"/>
       <RoundRectangle Text="Rettangolo smussato"/>
-      <Ellipse Text="Ellissre"/>
+      <Ellipse Text="Ellisse"/>
       <Triangle Text="Triangolo"/>
       <Diamond Text="Rombo"/>
     </Shapes>
     <PictureObject Text="Immagine"/>
     <TableObject Text="Tabella"/>
+    <Matrix Text="Matrice"/>
     <MatrixObject Text="Matrice"/>
     <SubreportObject Text="Subreport"/>
-    <BarcodeObject Text="Cadice a barre"/>
+    <BarcodeObject Text="Codice a barre"/>
     <RichObject Text="Ricco testo"/>
     <CheckBoxObject Text="casella di controllo"/>
     <ButtonControl Text="Bottone"/>
@@ -133,7 +134,7 @@
     <MdbFile Text=" Accesso al database MS (*.mdb)|*.mdb"/>
     <MdfFile Text="Microsoft SQL Server databases (*.mdf)|*.mdf"/>
     <RtfFile Text="Rich Text file (*.rtf)|*.rtf"/>
-    <Images Text="Image files|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Image files|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Assembly (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="File di stampa (*.prn)|*.prn"/>
     <BmpFile Text="BImmagine btmap  (*.bmp)|*.bmp"/>
@@ -1013,7 +1014,7 @@
       <InsertToRight Text="inserisce colonna a destra"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Unisci celle"/>
+      <Merge Text="Unisci celle"/>
       <Split Text="Dividi celle"/>
     </TableCell>
     <MatrixObject>

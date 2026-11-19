@@ -91,7 +91,7 @@ namespace FastReport.Matrix
     /// matrix.Data.Rows[0].TemplateTotalCell.Text = "Grand Total";
     /// </code>
     /// </example>
-    public partial class MatrixObject : TableBase
+    public partial class MatrixObject : TableBase, IContainDataSource
     {
         #region Fields
         private bool autoSize;
@@ -318,7 +318,7 @@ namespace FastReport.Matrix
         /// </summary>
         [Category("Behavior")]
         [DefaultValue(false)]
-        public bool SplitRows 
+        public bool SplitRows
         {
             get { return splitRows; }
             set { splitRows = value; }
@@ -564,6 +564,7 @@ namespace FastReport.Matrix
             ResultTable.Border = Border.Clone();
             ResultTable.Fill = Fill.Clone();
             ResultTable.Bounds = Bounds;
+            ResultTable.PrintOnParent = PrintOnParent;
             ResultTable.RepeatHeaders = RepeatHeaders;
             ResultTable.RepeatRowHeaders = RepeatRowHeaders;
             ResultTable.RepeatColumnHeaders = RepeatColumnHeaders;
@@ -615,6 +616,14 @@ namespace FastReport.Matrix
             if (match is bool && (bool)match == true)
                 Helper.AddDataRow();
         }
+
+        void IContainDataSource.UpdateDataSourceRef(DataSourceBase newRefDatasource)
+        {
+            if (newRefDatasource != null && (newRefDatasource.Name == DataSource.Name || newRefDatasource == DataSource))
+            {
+                DataSource = newRefDatasource;
+            }
+        }
         #endregion
 
         #region Protected Methods
@@ -649,7 +658,7 @@ namespace FastReport.Matrix
             MatrixEvenStylePriority = src.MatrixEvenStylePriority;
             SplitRows = src.SplitRows;
             PrintIfEmpty = src.PrintIfEmpty;
-            data = src.Data;            
+            data = src.Data;
         }
 
         /// <inheritdoc/>
@@ -760,12 +769,12 @@ namespace FastReport.Matrix
             CreateResultTable();
             Visible = false;
 
-            if (parent != null)
+            if (parent != null && !PrintOnParent)
             {
                 parent.Height = Top;
                 parent.CanGrow = false;
                 parent.CanShrink = false;
-                parent.AfterPrint += new EventHandler(ResultTable.GeneratePages);
+                parent.AfterPrint += ResultTable.GeneratePages;
             }
         }
 
@@ -773,7 +782,11 @@ namespace FastReport.Matrix
         public override void GetData()
         {
             base.GetData();
+            GetDataShared();
+        }
 
+        private void GetDataShared()
+        {
             if (!IsOnFooter)
             {
                 Helper.StartPrint();
@@ -785,8 +798,10 @@ namespace FastReport.Matrix
         public override void OnAfterData(EventArgs e)
         {
             base.OnAfterData(e);
-
             Helper.FinishPrint();
+
+            if (PrintOnParent)
+                ResultTable.AddToParent(Parent);
         }
 
         /// <inheritdoc/>
@@ -796,8 +811,8 @@ namespace FastReport.Matrix
             if (!saveVisible || (parent != null && !parent.Visible))
                 return;
 
-            if (parent != null)
-                parent.AfterPrint -= new EventHandler(ResultTable.GeneratePages);
+            if (parent != null && !PrintOnParent)
+                parent.AfterPrint -= ResultTable.GeneratePages;
 
             DisposeResultTable();
             Visible = saveVisible;

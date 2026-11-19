@@ -12,7 +12,7 @@ namespace FastReport.Code
     /// </summary>
     public class FindTextArgs
     {
-        
+
         private int startIndex;
         private int endIndex;
         private string openBracket;
@@ -71,10 +71,10 @@ namespace FastReport.Code
         /// </summary>
         public string FoundText
         {
-            get { return foundText;  }
+            get { return foundText; }
             set { foundText = value; }
         }
-     
+
     }
 
     /// <summary>
@@ -209,12 +209,15 @@ namespace FastReport.Code
 
         internal static string GetOptionalParameter(System.Reflection.ParameterInfo par, Language lang)
         {
-            if(!isTypeSuffixesInitialized)
+            if (!isTypeSuffixesInitialized)
                 InitializeTypeSuffixes();
             string optionalParamString = " = ";
-            if (par.DefaultValue.GetType().IsEnum)
-                optionalParamString += par.DefaultValue.GetType().Name + ".";
-            optionalParamString += par.DefaultValue.ToString();
+            if (par.DefaultValue != null)
+            {
+                if (par.DefaultValue.GetType().IsEnum)
+                    optionalParamString += par.DefaultValue.GetType().Name + ".";
+                optionalParamString += par.DefaultValue.ToString();
+            }
             if (TypeHasSuffix(par.ParameterType))
                 optionalParamString += GetTypeSuffix(par.ParameterType, lang);
             return optionalParamString;
@@ -281,7 +284,7 @@ namespace FastReport.Code
         /// </summary>
         /// <param name="args">Object with find arguments.</param>
         /// <param name="skipStrings">Indicates whether to skip strings.</param>
-        /// <returns>The expression if found; otherwise, returns an empty string.</returns>
+        /// <returns>The expression if found; otherwise, returns null.</returns>
         public static string GetExpression(FindTextArgs args, bool skipStrings)
         {
             if (args.StartIndex < args.Text.Length)
@@ -289,7 +292,7 @@ namespace FastReport.Code
                 if (FindMatchingBrackets(args, skipStrings))
                     return args.FoundText;
             }
-            return "";
+            return null;
         }
     }
 }

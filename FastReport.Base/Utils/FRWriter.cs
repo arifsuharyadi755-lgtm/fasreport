@@ -67,17 +67,18 @@ namespace FastReport.Utils
     public class FRWriter : IDisposable
     {
         #region Fields
-        private XmlDocument doc;
-        private XmlItem root;
+        private readonly XmlDocument doc;
+        private readonly XmlItem root;
         private XmlItem curItem;
         private XmlItem curRoot;
         //private StringBuilder FText;
         private object diffObject;
         private bool saveChildren;
+        private bool saveExternalPages;
         private bool writeHeader;
         private BlobStore blobStore;
         private SerializeTo serializeTo;
-        private Hashtable diffObjects;
+        private readonly Hashtable diffObjects;
         #endregion
 
         #region Properties
@@ -122,6 +123,15 @@ namespace FastReport.Utils
         {
             get { return saveChildren; }
             set { saveChildren = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets a value that determines whether is necessary to serialize external pages.
+        /// </summary>
+        public bool SaveExternalPages
+        {
+            get { return saveExternalPages; }
+            set { saveExternalPages = value; }
         }
 
         /// <summary>
@@ -218,7 +228,7 @@ namespace FastReport.Utils
                     try
                     {
                         Type objType = obj.GetType();
-                        if (!diffObjects.Contains(objType))
+                        if (!diffObjects.ContainsKey(objType))
                             diffObjects[objType] = Activator.CreateInstance(objType);
                         diffObject = diffObjects[objType];
                     }

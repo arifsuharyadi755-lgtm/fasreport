@@ -8,7 +8,10 @@ namespace FastReport.Gauge
     /// <summary>
     /// Represents a label of a gauge.
     /// </summary>
-    public class GaugeLabel : Component
+#if !DEBUG
+    [DesignTimeVisible(false)]
+#endif
+    public class GaugeLabel
     {
         #region Private Fields
         private string text;
@@ -55,8 +58,6 @@ namespace FastReport.Gauge
             get { return color; }
             set
             {
-                if (value == null)
-                    throw new ArgumentNullException("LabelFill");
                 color = value;
             }
         }

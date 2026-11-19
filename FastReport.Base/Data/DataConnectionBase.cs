@@ -4,6 +4,8 @@ using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
 using System.Drawing.Design;
+using System.Linq;
+using System.Reflection;
 using FastReport.Data.JsonConnection;
 using FastReport.Utils;
 
@@ -27,6 +29,7 @@ namespace FastReport.Data
         private DataSet dataSet;
         private TableCollection tables;
         private bool isSqlBased;
+        private bool canContainProcedures;
         private string connectionString;
         private string connectionStringExpression;
         private bool loginPrompt;
@@ -83,15 +86,23 @@ namespace FastReport.Data
         /// </code>
         /// </example>
         [Category("Data")]
+        [Browsable(true)]
         public string ConnectionString
         {
             get
             {
                 if (Report != null && Report.IsRunning && !String.IsNullOrEmpty(ConnectionStringExpression))
-                    return Report.Calc(ConnectionStringExpression).ToString();
+                {
+                    string value = (string)Report.Calc(ConnectionStringExpression);
+                    if (!string.IsNullOrEmpty(value))
+                        return value;
+                }
                 return connectionString;
             }
-            set { SetConnectionString(Crypter.DecryptString(value)); }
+            set
+            {
+                SetConnectionString(Crypter.DecryptString(value));
+            }
         }
 
         /// <summary>
@@ -132,6 +143,16 @@ namespace FastReport.Data
         }
 
         /// <summary>
+        /// Gets or sets a value indicates if this connection can contain procedures.
+        /// </summary>
+        [Browsable(false)]
+        public bool CanContainProcedures
+        {
+            get { return canContainProcedures; }
+            set { canContainProcedures = value; }
+        }
+
+        /// <summary>
         /// Gets or sets a value indicating whether a login dialog appears immediately before opening a connection.
         /// </summary>
         /// <remarks>
@@ -161,9 +182,12 @@ namespace FastReport.Data
             get { return commandTimeout; }
             set { commandTimeout = value; }
         }
+
+        internal List<XmlItem> TablesStructure { get; set; }
         #endregion
 
         #region Private Methods
+
         private void GetDBObjectNames(string name, List<string> list)
         {
             DataTable schema = null;
@@ -183,7 +207,7 @@ namespace FastReport.Data
             }
         }
 
-        private string PrepareSelectCommand(string selectCommand, string tableName, DbConnection connection)
+        protected string PrepareSelectCommand(string selectCommand, string tableName, DbConnection connection)
         {
             if (String.IsNullOrEmpty(selectCommand))
             {
@@ -192,7 +216,7 @@ namespace FastReport.Data
             return selectCommand;
         }
 
-        private TableDataSource FindTableDataSource(DataTable table)
+        protected TableDataSource FindTableDataSource(DataTable table)
         {
             foreach (TableDataSource c in Tables)
             {
@@ -201,6 +225,7 @@ namespace FastReport.Data
             }
             return null;
         }
+
         #endregion
 
         #region Protected Methods
@@ -342,20 +367,20 @@ namespace FastReport.Data
             for (int i = 0; i < Tables.Count; i++)
             {
                 TableDataSource table = Tables[i];
-                bool found = !String.IsNullOrEmpty(table.SelectCommand);
-                // skip tables with non-empty selectcommand
-                if (!found)
+                // skip queries and procedures
+                if (!String.IsNullOrEmpty(table.SelectCommand) || table is ProcedureDataSource)
+                    continue;
+
+                bool found = false;
+                foreach (string tableName in tableNames)
                 {
-                    foreach (string tableName in tableNames)
+                    if (String.Compare(table.TableName, tableName, true) == 0)
                     {
-                        if (String.Compare(table.TableName, tableName, true) == 0)
-                        {
-                            found = true;
-                            break;
-                        }
+                        found = true;
+                        break;
                     }
                 }
-                // table name not found between actual tablenames. It may happen if we have edited the connection.
+                // table name not found in actual tablenames. It may happen if we have edited the connection.
                 if (!found)
                 {
                     table.Dispose();
@@ -363,6 +388,7 @@ namespace FastReport.Data
                 }
             }
 
+            int tableNumber = 0;
             // now create tables that are not created yet.
             foreach (string tableName in tableNames)
             {
@@ -377,7 +403,11 @@ namespace FastReport.Data
                 }
                 if (!found)
                 {
-                    TableDataSource table = new TableDataSource();
+                    var table = new TableDataSource();
+                    // Enabled = false is used to ensure that when creating a connection,
+                    // none of the tables in the list of tables will be selected by default
+                    table.Enabled = false;
+
                     string fixedTableName = tableName.Replace(".", "_").Replace("[", "").Replace("]", "").Replace("\"", "");
                     if (Report != null)
                     {
@@ -386,12 +416,17 @@ namespace FastReport.Data
                     }
                     else
                         table.Name = fixedTableName;
-
+                    
                     table.TableName = tableName;
                     table.Connection = this;
-                    table.Enabled = false;
+
+                    if (TablesStructure != null)
+                    {
+                        table.Enabled = TablesStructure[tableNumber].Properties.Where(prop => prop.Key == "Enabled").Select(res => res.Value).First() == "true";
+                    }
 
                     Tables.Add(table);
+                    tableNumber++;
                 }
             }
 
@@ -403,6 +438,121 @@ namespace FastReport.Data
                     table.InitSchema();
                 }
             }
+        }
+
+        /// <summary>
+        /// Fills the <see cref="Tables"/> collection with all procedures available in the database.
+        /// </summary>
+        public virtual void CreateAllProcedures()
+        {
+            if (!CanContainProcedures)
+                return;
+            List<string> procedureNames = new List<string>();
+            procedureNames.AddRange(GetProcedureNames());
+            FilterTables(procedureNames);
+
+            // remove procedures that does not exist in the connection.
+            for (int i = 0; i < Tables.Count; i++)
+            {
+                var proc = Tables[i] as ProcedureDataSource;
+                if (proc == null)
+                    continue;
+
+                bool found = false;
+                foreach (string procName in procedureNames)
+                {
+                    if (String.Compare(proc.TableName, procName, true) == 0)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                // proc name not found in actual proc names. It may happen if we have edited the connection.
+                if (!found)
+                {
+                    proc.Dispose();
+                    i--;
+                }
+            }
+
+            // now create procedures that are not created yet.
+            foreach (string procName in procedureNames)
+            {
+                bool found = false;
+                foreach (TableDataSource table in Tables)
+                {
+                    if (String.Compare(table.TableName, procName, true) == 0)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    var proc = CreateProcedure(procName);
+                    proc.Enabled = false;
+
+                    string fixedName = procName.Replace(".", "_").Replace("[", "").Replace("]", "").Replace("\"", "");
+                    if (Report != null)
+                    {
+                        proc.Name = Report.Dictionary.CreateUniqueName(fixedName);
+                        proc.Alias = Report.Dictionary.CreateUniqueAlias(proc.Alias);
+                    }
+                    else
+                        proc.Name = fixedName;
+
+                    proc.TableName = procName;
+                    proc.Connection = this;
+
+                    Tables.Add(proc);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Create the stored procedure.
+        /// </summary>
+        public virtual TableDataSource CreateProcedure(string tableName)
+        {
+            ProcedureDataSource table = new ProcedureDataSource();
+            table.Enabled = true;
+            table.SelectCommand = tableName;
+            DbConnection conn = GetConnection();
+            try
+            {
+                OpenConnection(conn);
+                var schemaParameters = conn.GetSchema("PROCEDURE_PARAMETRS", new string[] { null, null, tableName });
+                foreach (DataRow row in schemaParameters.Rows)
+                {
+                    ParameterDirection direction = ParameterDirection.Input;
+                    switch (row["PARAMETER_MODE"].ToString())
+                    {
+                        case "IN":
+                            direction = ParameterDirection.Input;
+                            table.Enabled = false;
+                            break;
+                        case "INOUT":
+                            direction = ParameterDirection.InputOutput;
+                            table.Enabled = false;
+                            break;
+                        case "OUT":
+                            direction = ParameterDirection.Output;
+                            break;
+                    }
+                    table.Parameters.Add(new ProcedureParameter()
+                    {
+                        Name = row["PARAMETER_NAME"].ToString(),
+                        DataType = Convert.ToInt32(row["DATA_TYPE"].ToString()),
+                        Direction = direction
+                    });
+                }
+            }
+            finally
+            {
+                DisposeConnection(conn);
+            }
+
+            return table;
         }
 
         /// <summary>
@@ -452,6 +602,36 @@ namespace FastReport.Data
         }
 
         /// <summary>
+        /// Gets an array of subroutine names available in the database.
+        /// </summary>
+        /// <returns>An array of strings.</returns>
+        public virtual string[] GetProcedureNames()
+        {
+            List<string> list = new List<string>();
+            DataTable schema = null;
+            DbConnection conn = GetConnection();
+
+            if (conn != null)
+            {
+                try
+                {
+                    OpenConnection(conn);
+                    schema = conn.GetSchema("PROCEDURE");
+                    foreach (DataRow row in schema.Rows)
+                    {
+                        list.Add(row["PROCEDURE_NAME"].ToString());
+                    }
+                }
+                finally
+                {
+                    DisposeConnection(conn);
+                }
+            }
+
+            return list.ToArray();
+        }
+
+        /// <summary>
         /// Returns a type of connection.
         /// </summary>
         /// <returns><b>Type</b> instance.</returns>
@@ -480,7 +660,7 @@ namespace FastReport.Data
         /// <remarks>Either creates a new <b>DbConnection</b> instance of type provided by the
         /// <see cref="GetConnectionType"/> method, or returns the application connection if set
         /// in the Config.DesignerSettings.ApplicationConnection.</remarks>
-        public DbConnection GetConnection()
+        public virtual DbConnection GetConnection()
         {
             Type connectionType = GetConnectionType();
             if (connectionType != null)
@@ -511,7 +691,7 @@ namespace FastReport.Data
         /// property set to <b>true</b>. Once you have entered an user name and password in
         /// this dialog, it will remeber the entered values and will not used anymore in this report session.
         /// </remarks>
-        public void OpenConnection(DbConnection connection)
+        public virtual void OpenConnection(DbConnection connection)
         {
             if (connection.State == ConnectionState.Open)
                 return;
@@ -564,7 +744,7 @@ namespace FastReport.Data
         /// Disposes a connection.
         /// </summary>
         /// <param name="connection">The connection to dispose.</param>
-        public void DisposeConnection(DbConnection connection)
+        public virtual void DisposeConnection(DbConnection connection)
         {
 
             if (ShouldNotDispose(connection))
@@ -648,14 +828,26 @@ namespace FastReport.Data
             {
                 OpenConnection(conn);
 
+                TableDataSource dataSource = FindTableDataSource(table);
+
                 // prepare select command
-                selectCommand = PrepareSelectCommand(selectCommand, table.TableName, conn);
+                if (!(dataSource is ProcedureDataSource))
+                    selectCommand = PrepareSelectCommand(selectCommand, table.TableName, conn);
 
                 // read the table schema
                 using (DbDataAdapter adapter = GetAdapter(selectCommand, conn, parameters))
                 {
+                    adapter.SelectCommand.CommandType = dataSource is ProcedureDataSource ||
+                        adapter.SelectCommand.CommandType == CommandType.StoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
                     adapter.SelectCommand.CommandTimeout = CommandTimeout;
                     adapter.FillSchema(table, SchemaType.Source);
+                }
+
+                foreach (Column column in dataSource.Columns)
+                {
+                    // Deleting only disabled columns that exist in the table.
+                    if (!column.Enabled && table.Columns.Contains(column.Name))
+                        table.Columns.Remove(column.Name);
                 }
             }
             finally
@@ -683,15 +875,36 @@ namespace FastReport.Data
             {
                 OpenConnection(conn);
 
+                TableDataSource dataSource = FindTableDataSource(table);
+
                 // prepare select command
-                selectCommand = PrepareSelectCommand(selectCommand, table.TableName, conn);
+                if (!(dataSource is ProcedureDataSource))
+                    selectCommand = PrepareSelectCommand(selectCommand, table.TableName, conn);
 
                 // read the table
                 using (DbDataAdapter adapter = GetAdapter(selectCommand, conn, parameters))
                 {
+                    adapter.SelectCommand.CommandType = dataSource is ProcedureDataSource ||
+                        adapter.SelectCommand.CommandType == CommandType.StoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
                     adapter.SelectCommand.CommandTimeout = CommandTimeout;
                     table.Clear();
                     adapter.Fill(table);
+
+                    // copy output parameter values
+                    foreach (DbParameter dp in adapter.SelectCommand.Parameters)
+                    {
+                        if (dp.Direction != ParameterDirection.Input)
+                        {
+                            foreach (CommandParameter cp in parameters)
+                            {
+                                if (cp.Name == dp.ParameterName)
+                                {
+                                    cp.Value = dp.Value;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
             }
             finally
@@ -755,7 +968,7 @@ namespace FastReport.Data
         public virtual void Clone()
         {
             XmlItem item = new XmlItem();
-            using(FRWriter writer = new FRWriter(item))
+            using (FRWriter writer = new FRWriter(item))
             {
                 writer.SerializeTo = SerializeTo.Clipboard;
                 writer.BlobStore = new BlobStore(false);
@@ -806,7 +1019,7 @@ namespace FastReport.Data
                 writer.WriteBool("LoginPrompt", true);
             if (CommandTimeout != 30)
                 writer.WriteInt("CommandTimeout", CommandTimeout);
-
+            SerializeDesignExt(writer);
             if (writer.SaveChildren)
             {
                 foreach (TableDataSource c in Tables)
@@ -822,6 +1035,11 @@ namespace FastReport.Data
         {
             return new string[] { ConnectionStringExpression };
         }
+
+        partial void SetMaskConnectionStringPassword();
+
+        partial void SetConnectionStringBrowsableAttribute();
+
         #endregion
 
         /// <summary>
@@ -833,8 +1051,13 @@ namespace FastReport.Data
             connectionString = "";
             connectionStringExpression = "";
             IsSqlBased = true;
+            canContainProcedures = false;
             commandTimeout = 30;
             SetFlags(Flags.CanEdit, true);
+            SetConnectionStringBrowsableAttribute();
+            SetMaskConnectionStringPassword();
         }
+
+        partial void SerializeDesignExt(FRWriter writer);
     }
 }

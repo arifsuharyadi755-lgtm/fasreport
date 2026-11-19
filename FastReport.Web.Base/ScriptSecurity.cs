@@ -21,9 +21,9 @@ namespace FastReport.Web
 
     }
 
-    internal class ScriptSecurity : IDisposable
+    internal sealed class ScriptSecurity : IDisposable
     {
-        private IScriptChecker ScriptChecker;
+        private readonly IScriptChecker ScriptChecker;
 
         internal ScriptSecurity(IScriptChecker checker)
         {
@@ -60,7 +60,7 @@ namespace FastReport.Web
         bool IsValid(Language lang, string reportScript, string[] references, Report report);
     }
 
-    internal class ScriptChecker : IScriptChecker
+    internal sealed class ScriptChecker : IScriptChecker
     {
         public bool IsValid(Language lang, string reportScript, string[] references, Report report)
         {
@@ -78,13 +78,16 @@ namespace FastReport.Web
                     return false;
             }
 
+            foreach (Regex pattern in Config.ScriptSecurityProps.RegexStopList)
+            {
+                if (pattern.IsMatch(reportScript))
+                    return false;
+            }
+
             foreach (string pattern in Config.ScriptSecurityProps.StopList)
             {
                 if (reportScript.IndexOf(pattern) != -1)
                     return false;
-
-                //regex = new Regex(pattern);
-                //if (regex.IsMatch(reportScript))
             }
 
             return true;

@@ -1,5 +1,7 @@
 ﻿using FastReport.Utils;
 
+using System;
+
 namespace FastReport
 {
     partial class Report
@@ -10,16 +12,6 @@ namespace FastReport
         {
             if (preparedPages != null)
                 preparedPages.Clear();
-        }
-
-        /// <summary>
-        /// Does nothing
-        /// </summary>
-        /// <param name="password"></param>
-        /// <returns>password</returns>
-        private string ShowPaswordForm(string password)
-        {
-            return password;
         }
 
         /// <summary>
@@ -43,6 +35,11 @@ namespace FastReport
         /// Does nothing
         /// </summary>
         partial void DisposeDesign();
+
+        partial void StartPerformanceCounter();
+
+        partial void StopPerformanceCounter();
+
 
         #endregion Private Methods
     }

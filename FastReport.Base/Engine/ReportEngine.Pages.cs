@@ -74,8 +74,24 @@ namespace FastReport.Engine
             for (int i = 0; i < Report.Pages.Count; i++)
             {
                 ReportPage page = Report.Pages[i] as ReportPage;
-                if (page != null && page.Visible && page.Subreport == null)
-                    RunReportPage(page);
+
+                if (page != null)
+                {
+                    // Calc and apply visible expression if needed.
+                    if (!String.IsNullOrEmpty(page.VisibleExpression))
+                    {
+                        page.Visible = page.CalcVisibleExpression(page.VisibleExpression);
+                    }
+
+                    // Calc and apply printable expression if needed.
+                    if (!String.IsNullOrEmpty(page.PrintableExpression))
+                    {
+                        page.Printable = page.CalcVisibleExpression(page.PrintableExpression);
+                    }
+
+                    if (page.Visible && page.Subreport == null)
+                        RunReportPage(page);
+                }
                 if (Report.Aborted)
                     break;
             }
@@ -117,11 +133,66 @@ namespace FastReport.Engine
 
         private bool StartFirstPage()
         {
+            var previousPage = StartFirstPageShared();
+
+            // show report title and page header
+            if (previousPage)
+                ShowBand(page.ReportTitle);
+            else
+            {
+                if (page.Overlay != null)
+                    ShowBand(page.Overlay);
+                if (page.TitleBeforeHeader)
+                {
+                    ShowBand(page.ReportTitle);
+                    ShowPageHeader();
+                }
+                else
+                {
+                    ShowPageHeader();
+                    ShowBand(page.ReportTitle);
+                }
+            }
+
+            // show column header
+            columnStartY = CurY;
+            ShowBand(page.ColumnHeader);
+
+            // calculate CurX before starting column event depending on Right to Left or Left to Right layout
+            if (Config.RightToLeft)
+            {
+                CurX = page.Columns.Positions[page.Columns.Positions.Count - 1] * Units.Millimeters;
+            }
+            else
+            {
+                CurX = page.Columns.Positions[0] * Units.Millimeters;
+            }
+
+            // start column event
+            OnStateChanged(page, EngineState.ColumnStarted);
+            ShowProgress();
+            return previousPage;
+        }
+
+        private bool StartFirstPageShared()
+        {
             page.InitializeComponents();
 
             CurX = 0;
             CurY = 0;
             curColumn = 0;
+
+            // Disable columns of page when page has DataBand with columns and these columns has "across then down" layout.
+            // Without this fix, columns of page will be printed over columns of band when pages more than one.
+            if (page.Columns.Count > 1)
+            {
+                foreach (BandBase band in page.Bands)
+                {
+                    if (band is DataBand && (band as DataBand).Columns.Count > 1 &&
+                        (band as DataBand).Columns.Layout == ColumnLayout.AcrossThenDown)
+                        page.Columns.Count = 1;
+                }
+            }
 
             if (page.ResetPageNumber)
                 ResetLogicalPageNumber();
@@ -186,6 +257,7 @@ namespace FastReport.Engine
                 CurY = PreparedPages.GetLastY();
             else
             {
+                page.OnCreatePage(EventArgs.Empty);
                 PreparedPages.AddPage(page);
                 if (page.StartOnOddPage && (CurPage % 2) == 1)
                     PreparedPages.AddPage(page);
@@ -201,42 +273,6 @@ namespace FastReport.Engine
             OutlineRoot();
             AddPageOutline();
 
-            // show report title and page header
-            if (previousPage)
-                ShowBand(page.ReportTitle);
-            else
-            {
-                if (page.Overlay != null)
-                    ShowBand(page.Overlay);
-                if (page.TitleBeforeHeader)
-                {
-                    ShowBand(page.ReportTitle);
-                    ShowPageHeader();
-                }
-                else
-                {
-                    ShowPageHeader();
-                    ShowBand(page.ReportTitle);
-                }
-            }
-
-            // show column header
-            columnStartY = CurY;
-            ShowBand(page.ColumnHeader);
-
-            // calculate CurX before starting column event depending on Right to Left or Left to Right layout
-            if (Config.RightToLeft)
-            {
-                CurX = page.Columns.Positions[page.Columns.Positions.Count - 1] * Units.Millimeters;
-            }
-            else
-            {
-                CurX = 0;
-            }
-
-            // start column event
-            OnStateChanged(page, EngineState.ColumnStarted);
-            ShowProgress();
             return previousPage;
         }
 
@@ -284,14 +320,14 @@ namespace FastReport.Engine
             if (curColumn >= page.Columns.Count)
                 curColumn = 0;
 
-            // apply Right to Left layot if needed
+            // apply Right to Left layout if needed
             if (Config.RightToLeft)
             {
                 curX = page.Columns.Positions[page.Columns.Count - curColumn - 1] * Units.Millimeters;
             }
             else
             {
-                curX = curColumn == 0 ? 0 : page.Columns.Positions[curColumn] * Units.Millimeters;
+                curX = page.Columns.Positions[curColumn] * Units.Millimeters;
             }
 
             if (CurColumn == 0)
@@ -326,6 +362,7 @@ namespace FastReport.Engine
 
         private void StartPage()
         {
+            page.OnCreatePage(EventArgs.Empty);
             // apply Right to Left layout if needed 
             if (Config.RightToLeft)
             {
@@ -333,7 +370,7 @@ namespace FastReport.Engine
             }
             else
             {
-                CurX = 0;
+                CurX = page.Columns.Positions[0] * Units.Millimeters;
             }
 
             CurY = 0;
@@ -346,7 +383,7 @@ namespace FastReport.Engine
                 ShowBand(page.Overlay);
             ShowPageHeader();
             OnStateChanged(page, EngineState.PageStarted);
-
+           
             columnStartY = CurY;
 
             StartColumn();

@@ -100,6 +100,7 @@
     </Shapes>
     <PictureObject Text="Slika"/>
     <TableObject Text="Tablica"/>
+    <Matrix Text="Matrica"/>
     <MatrixObject Text="Matrica"/>
     <SubreportObject Text="Podizvještaj"/>
     <BarcodeObject Text="Barkod"/>
@@ -148,7 +149,7 @@
     <MdbFile Text="MS Access baza (*.mdb)|*.mdb"/>
     <MdfFile Text="Microsoft SQL Server baza (*.mdf)|*.mdf"/>
     <RtfFile Text="Rich Text file (*.rtf)|*.rtf"/>
-    <Images Text="Datoteke slika|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Datoteke slika|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Assembly (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="Datoteka pisača (*.prn)|*.prn"/>
     <BmpFile Text="Bitmap slika (*.bmp)|*.bmp"/>
@@ -1340,7 +1341,7 @@
       <InsertToRight Text="Umetni kolonu u desno"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Spoji ćelije"/>
+      <Merge Text="Spoji ćelije"/>
       <Split Text="Razdvoji ćelije"/>
     </TableCell>
     <MatrixObject>
@@ -1474,11 +1475,11 @@
     <Ods Text="Izvoz u Open Office Calc">
       <File Text="OpenOffice Calc"/>
     </Ods>
-    <Xlsx Text="Izvoz u Excel 2007">
-      <File Text="Excel 2007 datoteka"/>
+    <Xlsx Text="Izvoz u Microsoft Excel">
+      <File Text="Microsoft Excel datoteka"/>
     </Xlsx>
-    <Pptx Text="Izvoz u PowerPoint 2007">
-      <File Text="PowerPoint 2007 datoteka"/>
+    <Pptx Text="Izvoz u Microsoft PowerPoint">
+      <File Text="Microsoft PowerPoint datoteka"/>
     </Pptx>
     <Pdf Text="Izvoz u PDF">
       <File Text="Adobe Acrobat"/>

@@ -1,6 +1,7 @@
 using FastReport.Utils;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -9,9 +10,18 @@ using System.Text;
 namespace FastReport.Export.Html
 {
     /// <summary>
+    /// For internal use only.
+    /// </summary>
+    public interface IHTMLBaseExport 
+    {
+        public bool Layers { get; }
+        public bool EnableVectorObjects  { get; }
+    }
+
+    /// <summary>
     /// Represents the HTML export filter.
     /// </summary>
-    public partial class HTMLExport : ExportBase
+    public partial class HTMLExport : ExportBase, IHTMLBaseExport
     {
         /// <summary>
         /// Draw any custom controls
@@ -22,7 +32,7 @@ namespace FastReport.Export.Html
         /// Draw any custom controls.
         /// </summary>
         /// <param name="e"></param>
-        public void OnCustomDraw(CustomDrawEventArgs e)
+        private void OnCustomDraw(CustomDrawEventArgs e)
         {
             if (CustomDraw != null)
             {
@@ -93,8 +103,10 @@ namespace FastReport.Export.Html
 
         private bool layers;
         private bool wysiwyg;
-        private MyRes res;
-        private HtmlTemplates templates;
+        private bool notRotateLandscapePage;
+        private bool highQualitySVG;
+        private readonly MyRes res;
+        private readonly HtmlTemplates templates;
         private string targetPath;
         private string targetIndexPath;
         private string targetFileName;
@@ -133,9 +145,8 @@ namespace FastReport.Export.Html
         private bool pageBreaks;
         private bool print;
         private bool preview;
-        private List<string> cssStyles;
+        private readonly List<string> cssStyles;
         private float hPos;
-        private NumberFormatInfo numberFormat;
         private string pageStyleName;
 
         private bool saveStreams;
@@ -145,14 +156,14 @@ namespace FastReport.Export.Html
 
         private const string BODY_BEGIN = "</head>\r\n<body bgcolor=\"#FFFFFF\" text=\"#000000\">";
         private const string BODY_END = "</body>";
-        private const string PRINT_JS = "<script language=\"javascript\" type=\"text/javascript\"> parent.focus(); parent.print();</script>";
+        private const string PRINT_JS = "<script language=\"javascript\" type=\"text/javascript\"> parent.focus(); parent.print(); window.addEventListener('afterprint', function(event) { window.close(); })</script>";
         private const string NBSP = "&nbsp;";
         private int currentPage = 0;
         private HTMLData d;
         private IGraphics htmlMeasureGraphics;
         private float maxWidth, maxHeight;
-        private FastString css;
-        private FastString htmlPage;
+        private readonly FastString css = new FastString(4096);
+        private readonly FastString htmlPage = new FastString(4096);
         private float leftMargin, topMargin;
         private bool enableMargins = false;
         private ExportType exportMode;
@@ -240,6 +251,7 @@ namespace FastReport.Export.Html
         /// <summary>
         /// For internal use only.
         /// </summary>
+        [EditorBrowsable(EditorBrowsableState.Advanced)]
         public List<HTMLPageData> PreparedPages
         {
             get { return pages; }
@@ -252,6 +264,15 @@ namespace FastReport.Export.Html
         {
             get { return print; }
             set { print = value; }
+        }
+
+        /// <summary>
+        /// Enable or disable a picture optimization.
+        /// </summary>
+        public bool HighQualitySVG
+        {
+            get { return highQualitySVG; }
+            set { highQualitySVG = value; }
         }
 
         /// <summary>
@@ -363,7 +384,7 @@ namespace FastReport.Export.Html
         }
 
         /// <summary>
-        ///  Gets or sets the Wysiwyg quality of export
+        ///  Gets or sets the WYSIWYG quality of export
         /// </summary>
         public bool Wysiwyg
         {
@@ -387,8 +408,6 @@ namespace FastReport.Export.Html
         {
             get { return printPageData; }
         }
-
-        
 
         /// <summary>
         /// Enable or disable saving streams in GeneratedStreams collection.
@@ -417,6 +436,15 @@ namespace FastReport.Export.Html
             set { enableVectorObjects = value; }
         }
 
+        /// <summary>
+        /// Not rotate landscape page when print.
+        /// </summary>
+        public bool NotRotateLandscapePage
+        {
+            get { return notRotateLandscapePage; }
+            set { notRotateLandscapePage = value; }
+        }
+
         #endregion Public properties
 
         #region Private methods
@@ -441,8 +469,7 @@ namespace FastReport.Export.Html
             {
                 if (!layers)
                 {
-                    pages[CurrentPage].CSSText = Page.ToString();
-                    Page.Clear();
+                    pages[CurrentPage].CSSText = Page.StringBuilder;
                 }
                 pages[CurrentPage].PageNumber = PageNumber;
             }
@@ -496,13 +523,11 @@ namespace FastReport.Export.Html
 
             if (Page != null)
             {
-                pages[d.CurrentPage].PageText = Page.ToString();
-                Page.Clear();
+                pages[d.CurrentPage].PageText = Page.StringBuilder;
             }
             if (CSS != null)
             {
-                pages[d.CurrentPage].CSSText = CSS.ToString();
-                CSS.Clear();
+                pages[d.CurrentPage].CSSText = CSS.StringBuilder;
             }
             pages[d.CurrentPage].PageEvent.Set();
         }
@@ -568,9 +593,9 @@ namespace FastReport.Export.Html
         private void ExportHTMLIndex(Stream stream)
         {
             ExportUtils.Write(stream, String.Format(templates.IndexTemplate,
-                new object[] { documentTitle, ExportUtils.HtmlURL(navFileName),
+                documentTitle, ExportUtils.HtmlURL(navFileName),
                         ExportUtils.HtmlURL(targetFileName +
-                        (singlePage ? ".main" : "1") + ".html") }));
+                        (singlePage ? ".main" : "1") + ".html")));
         }
 
         private void ExportHTMLNavigator(Stream stream)
@@ -580,16 +605,16 @@ namespace FastReport.Export.Html
             //  {4} first caption {5} previous caption {6} next caption {7} last caption
             //  {8} total caption
             ExportUtils.Write(stream, String.Format(templates.NavigatorTemplate,
-                new object[] { pagesCount.ToString(),
+                pagesCount.ToString(),
                         documentTitle, (singlePage ? "0" : "1"),
                         prefix, res.Get("First"), res.Get("Prev"),
-                        res.Get("Next"), res.Get("Last"), res.Get("Total") }));
+                        res.Get("Next"), res.Get("Last"), res.Get("Total")));
         }
 
         private void Init()
         {
             htmlMeasureGraphics = Report.MeasureGraphics;
-            cssStyles = new List<string>();
+            cssStyles.Clear();
             hPos = 0;
             count = Report.PreparedPages.Count;
             pagesCount = 0;
@@ -687,7 +712,19 @@ namespace FastReport.Export.Html
                     singlePage = true;
                     subFolder = false;
                     navigator = false;
-                    if (format == HTMLExportFormat.HTML && !embedPictures)
+                    if (ExportMode == ExportType.WebPrint)
+                    {
+                        NotRotateLandscapePage = true;
+                        for (int i = 0; i < Report.PreparedPages.Count; i++)
+                        {
+                            if (!Report.PreparedPages.GetPage(i).Landscape)
+                            {
+                                NotRotateLandscapePage = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (format == HTMLExportFormat.HTML && !embedPictures && !saveStreams)
                         pictures = false;
                 }
                 else
@@ -945,6 +982,8 @@ namespace FastReport.Export.Html
             writer.WriteBool("SubFolder", SubFolder);
             writer.WriteBool("Navigator", Navigator);
             writer.WriteBool("SinglePage", SinglePage);
+            writer.WriteBool("NotRotateLandscapePage", NotRotateLandscapePage);
+            writer.WriteBool("HighQualitySVG", HighQualitySVG);
         }
 
         /// <summary>
@@ -972,7 +1011,7 @@ namespace FastReport.Export.Html
         {
             Zoom = 1.0f;
             HasMultipleFiles = true;
-            layers = false;
+            layers = true;
             wysiwyg = true;
             pictures = true;
             webMode = false;
@@ -990,13 +1029,14 @@ namespace FastReport.Export.Html
             print = false;
             preview = false;
             saveStreams = false;
-            numberFormat = new NumberFormatInfo();
-            numberFormat.NumberGroupSeparator = String.Empty;
-            numberFormat.NumberDecimalSeparator = ".";
+            cssStyles = new List<string>();
             exportMode = ExportType.Export;
             res = new MyRes("Export,Html");
             embeddedImages = new Dictionary<string, string>();
+            notRotateLandscapePage = false;
+            highQualitySVG = false;
         }
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HTMLExport"/> class for WebPreview mode.
@@ -1006,6 +1046,14 @@ namespace FastReport.Export.Html
             this.webPreview = webPreview;
             if (webPreview)
                 exportMode = ExportType.WebPreview;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (pages != null)
+                foreach (var page in pages)
+                    page.Dispose();
         }
     }
 
@@ -1025,7 +1073,7 @@ namespace FastReport.Export.Html
         public ReportComponentBase reportObject;
 
         /// <summary>
-        /// Resulting successfull drawing flag.
+        /// Resulting successful drawing flag.
         /// </summary>
         public bool done = false;
 

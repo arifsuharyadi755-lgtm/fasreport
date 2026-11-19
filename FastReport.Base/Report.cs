@@ -10,11 +10,15 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Text;
 using System.IO;
+using System.Linq;
+using System.Linq.Expressions;
 using System.Security;
 using System.Text;
+using System.Windows.Forms;
 
 namespace FastReport
 {
@@ -205,9 +209,10 @@ namespace FastReport
     /// </code>
     /// </example>
 
-    public partial class Report : Base, IParent, ISupportInitialize
+    public partial class Report : Base, IParent, ISupportInitialize, IComponent
     {
         #region Fields
+        private ISite _site;
 
         private PageCollection pages;
         private Dictionary dictionary;
@@ -235,7 +240,8 @@ namespace FastReport
         private GraphicCache graphicCache;
         private string[] referencedAssemblies;
         private Hashtable cachedDataItems;
-        private AssemblyCollection assemblies;
+        private CodeProvider _codeProvider;
+        private bool _needCompile;
         private FastReport.Preview.PreparedPages preparedPages;
         private ReportEngine engine;
         private bool aborted;
@@ -244,17 +250,35 @@ namespace FastReport
         private bool storeInResources;
         private PermissionSet scriptRestrictions;
         private ReportOperation operation;
-        private int tickCount;
-        private bool needCompile;
         private bool needRefresh;
+        private bool isParameterChanged = false;
         private bool initializing;
         private object initializeData;
         private string initializeDataName;
         private object tag;
+        private bool isLoadPrepared = false;
 
         #endregion Fields
 
         #region Properties
+        /// <summary>
+        /// Gets or sets the site of the <see cref='System.ComponentModel.Component'/>.
+        /// </summary>
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public virtual ISite Site
+        {
+            get => _site;
+            set => _site = value;
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether the <see cref='System.ComponentModel.Component'/>
+        /// is currently in design mode.
+        /// </summary>
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        protected bool DesignMode => _site?.DesignMode ?? false;
 
         /// <summary>
         /// Occurs when calc execution is started.
@@ -374,6 +398,14 @@ namespace FastReport
         }
 
         /// <summary>
+        /// Gets a value indicating whether Report is prepared
+        /// </summary>
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public bool IsPrepared
+        {
+            get { return !isParameterChanged && PreparedPages != null && PreparedPages.Count != 0; }
+        }
+        /// <summary>
         /// Gets or sets the absolute path to the parent report.
         /// </summary>
         /// <remarks>
@@ -423,7 +455,10 @@ namespace FastReport
         public string ScriptText
         {
             get { return scriptText; }
-            set { scriptText = value; }
+            set
+            {
+                scriptText = value;
+            }
         }
 
         /// <summary>
@@ -447,7 +482,9 @@ namespace FastReport
                 else
                     codeHelper = new VbCodeHelper(this);
                 if (needClear)
+                {
                     scriptText = codeHelper.EmptyScript();
+                }
             }
         }
 
@@ -502,6 +539,14 @@ namespace FastReport
         {
             get { return compressed; }
             set { compressed = value; }
+        }
+
+        /// <summary>
+        /// Returns a bool value depending on the .frx or .fpx report was loaded
+        /// </summary>
+        public bool IsLoadPrepared
+        {
+            get => isLoadPrepared;
         }
 
         /// <summary>
@@ -619,7 +664,8 @@ namespace FastReport
         public string[] ReferencedAssemblies
         {
             get { return referencedAssemblies; }
-            set {
+            set
+            {
                 if (value != null)
                 {
                     // fix for old reports with "System.Windows.Forms.DataVisualization" in referenced assemblies 
@@ -628,7 +674,7 @@ namespace FastReport
                         value[i] = value[i].Replace("System.Windows.Forms.DataVisualization", "FastReport.DataVisualization");
                     }
                 }
-                referencedAssemblies = value; 
+                referencedAssemblies = value;
             }
         }
 
@@ -691,6 +737,7 @@ namespace FastReport
         /// </remarks>
         [Browsable(false)]
         [Localizable(true)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public string ReportResourceString
         {
             get
@@ -829,6 +876,7 @@ namespace FastReport
         /// Gets or sets the Tag object of the report.
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public object Tag
         {
             get { return tag; }
@@ -849,11 +897,19 @@ namespace FastReport
                     "System.Xml.dll",
 
                     "FastReport.Compat.dll",
-#if !NETSTANDARD
+#if !CROSSPLATFORM && !(WPF || AVALONIA)
                     "System.Windows.Forms.dll",
 #endif
 
-#if NETSTANDARD || NETCOREAPP
+#if WPF
+                    "FastReport.Forms.WPF.dll",
+#endif
+
+#if AVALONIA
+                    "FastReport.Forms.Avalonia.dll",
+#endif
+
+#if CROSSPLATFORM || COREWIN
                     "System.Drawing.Primitives",
 #endif
 
@@ -869,24 +925,39 @@ namespace FastReport
             get { return codeHelper; }
         }
 
+        internal bool HasPageLinks
+        {
+            get
+            {
+                foreach(var page in Pages)
+                {
+                    if(page is ReportPage reportPage && reportPage.LinkToPage.IsInherit)
+                        return true;
+                }
+
+                return false;
+            }
+        }
+
+
         public IGraphics MeasureGraphics
         {
             get
             {
                 if (measureGraphics == null)
                 {
-#if NETSTANDARD2_0 || NETSTANDARD2_1 || MONO
+#if CROSSPLATFORM || MONO
                     measureBitmap = new Bitmap(1, 1);
                     measureGraphics = new GdiGraphics(measureBitmap);
 #else
-                    measureGraphics = new GdiGraphics(Graphics.FromHwnd(IntPtr.Zero), false);
+                    measureGraphics = GdiGraphics.FromGraphics(Graphics.FromHwnd(IntPtr.Zero));
 #endif
                 }
                 return measureGraphics;
             }
         }
 
-        internal string GetReportName
+        public string GetReportName
         {
             get
             {
@@ -900,6 +971,7 @@ namespace FastReport
         /// <summary>
         /// Gets or sets the flag for refresh.
         /// </summary>
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public bool NeedRefresh
         {
             get { return needRefresh; }
@@ -922,9 +994,18 @@ namespace FastReport
             }
         }
 
-#endregion Properties
+        /// <summary>
+        /// Gets or sets the code provider used for report code compilation.
+        /// </summary>
+        public CodeProvider CodeProvider
+        {
+            get => _codeProvider ??= CodeProvider.GetCodeProvider(this);
+            set => _codeProvider = value;
+        }
 
-#region Private Methods
+        #endregion Properties
+
+        #region Private Methods
 
         private bool ShouldSerializeReferencedAssemblies()
         {
@@ -989,7 +1070,10 @@ namespace FastReport
                 // convert the relative path to absolute path (based on the main report path).
                 if (!Path.IsPathRooted(value))
                 {
-                    value = Path.GetFullPath(Path.GetDirectoryName(FileName) + Path.DirectorySeparatorChar + value);
+                    var fullPath = Path.GetFullPath(Path.GetDirectoryName(FileName));
+                    // since directory path separator for Win OS is  '\' and for Unix OS is '/'
+                    // we have to modify the incoming path string with actual for current OS path separator
+                    value = Path.Combine(fullPath, GetFixedSeparatedPath(value));
                 }
                 if (!File.Exists(value) && File.Exists(BaseReportAbsolutePath))
                 {
@@ -1013,6 +1097,11 @@ namespace FastReport
             baseReport = value;
         }
 
+        private static string GetFixedSeparatedPath(string baseReport)
+        {
+            return baseReport.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+        }
+
         private void GetDiff(object sender, DiffEventArgs e)
         {
             if (baseReportObject != null)
@@ -1022,16 +1111,6 @@ namespace FastReport
                 else if (e.Object is Base)
                     e.DiffObject = baseReportObject.FindObject((e.Object as Base).Name);
             }
-        }
-
-        private void StartPerformanceCounter()
-        {
-            tickCount = Environment.TickCount;
-        }
-
-        private void StopPerformanceCounter()
-        {
-            tickCount = Environment.TickCount - tickCount;
         }
 
         private void ClearReportProperties()
@@ -1046,7 +1125,8 @@ namespace FastReport
             {
                 ScriptLanguage = Language.CSharp;
             }
-            ScriptText = codeHelper.EmptyScript();
+            // not property, only field!
+            scriptText = codeHelper.EmptyScript();
             BaseReport = "";
             BaseReportAbsolutePath = "";
             DoublePass = false;
@@ -1060,21 +1140,26 @@ namespace FastReport
             ClearDesign();
             Styles.Clear();
             Styles.Name = "";
-            ReferencedAssemblies = DefaultAssemblies;
+            referencedAssemblies = DefaultAssemblies;
             StartReportEvent = "";
             FinishReportEvent = "";
-            needCompile = true;
+            _needCompile = true;
+            CodeProvider.Clear();
         }
 
-#endregion Private Methods
+        #endregion Private Methods
 
-#region Protected Methods
-
+        #region Protected Methods
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
+                lock (this)
+                {
+                    _site?.Container?.Remove(this);
+                }
+
                 if (graphicCache != null)
                     graphicCache.Dispose();
                 graphicCache = null;
@@ -1104,9 +1189,9 @@ namespace FastReport
                 base.DeserializeSubItems(reader);
         }
 
-#endregion Protected Methods
+        #endregion Protected Methods
 
-#region IParent
+        #region IParent
 
         /// <inheritdoc/>
         public bool CanContain(Base child)
@@ -1173,9 +1258,9 @@ namespace FastReport
             // do nothing
         }
 
-#endregion IParent
+        #endregion IParent
 
-#region ISupportInitialize Members
+        #region ISupportInitialize Members
 
         /// <inheritdoc/>
         public void BeginInit()
@@ -1190,9 +1275,9 @@ namespace FastReport
             Dictionary.RegisterData(initializeData, initializeDataName, false);
         }
 
-#endregion ISupportInitialize Members
+        #endregion ISupportInitialize Members
 
-#region Script related
+        #region Script related
 
         private void FillDataSourceCache()
         {
@@ -1234,19 +1319,13 @@ namespace FastReport
         {
             FillDataSourceCache();
 
-            if (needCompile)
+            if (_needCompile)
             {
-                AssemblyDescriptor descriptor = new AssemblyDescriptor(this, ScriptText);
-                assemblies.Clear();
-                assemblies.Add(descriptor);
-                descriptor.AddObjects();
-                descriptor.AddExpressions();
-                descriptor.AddFunctions();
-                descriptor.Compile();
+                CodeProvider.Compile();
             }
             else
             {
-                InternalInit();
+                CodeProvider.InternalInit();
             }
         }
 
@@ -1258,12 +1337,8 @@ namespace FastReport
         /// </remarks>
         protected void InternalInit()
         {
-            needCompile = false;
-
-            AssemblyDescriptor descriptor = new AssemblyDescriptor(this, CodeHelper.EmptyScript());
-            assemblies.Clear();
-            assemblies.Add(descriptor);
-            descriptor.InitInstance(this);
+            _needCompile = false;
+            CodeProvider.InternalInit();
         }
 
         /// <summary>
@@ -1281,22 +1356,7 @@ namespace FastReport
         /// </remarks>
         public void GenerateReportAssembly(string fileName)
         {
-            // create the class name
-            string className = "";
-            string punctuation = " ~`!@#$%^&*()-=+[]{},.<>/?;:'\"\\|";
-            foreach (char c in Path.GetFileNameWithoutExtension(fileName))
-            {
-                if (!punctuation.Contains(c.ToString()))
-                    className += c;
-            }
-
-            AssemblyDescriptor descriptor = new AssemblyDescriptor(this, ScriptText);
-            descriptor.AddObjects();
-            descriptor.AddExpressions();
-            descriptor.AddFunctions();
-
-            string reportClassText = descriptor.GenerateReportClass(className);
-            File.WriteAllText(fileName, reportClassText, Encoding.UTF8);
+            CodeProvider.GenerateReportAssembly(fileName);
         }
 
         /// <summary>
@@ -1328,10 +1388,23 @@ namespace FastReport
         /// </remarks>
         public object Calc(string expression, Variant value)
         {
+            if (TryCalc(expression, value, out var result))
+                return result;
+
+            return CalcExpression(expression, value);
+        }
+
+        /// <summary>
+        /// Tries to calculate an expression fast way.
+        /// </summary>
+        private bool TryCalc(string expression, Variant value, out object result)
+        {
+            result = null;
+            
             if (!IsRunning)
-                return null;
+                return true;
             if (String.IsNullOrEmpty(expression) || String.IsNullOrEmpty(expression.Trim()))
-                return null;
+                return true;
 
             string expr = expression;
             if (expr.StartsWith("[") && expr.EndsWith("]"))
@@ -1342,13 +1415,11 @@ namespace FastReport
 
             if (cachedObject is CachedDataItem)
             {
-                CachedDataItem cachedItem = cachedDataItems[expr] as CachedDataItem;
+                CachedDataItem cachedItem = cachedObject as CachedDataItem;
                 DataSourceBase data = cachedItem.dataSource;
                 Column column = cachedItem.column;
 
-                object val = ConvertToColumnDataType(column.Value, column.DataType, false);
-
-                
+                object val = ConvertToColumnDataType(column.Value, column.DataType, ConvertNulls);
 
                 if (CustomCalc != null)
                 {
@@ -1357,11 +1428,13 @@ namespace FastReport
                     val = e.CalculatedObject;
                 }
 
-                return val;
+                result = val;
+                return true;
             }
             else if (cachedObject is Parameter)
             {
-                return (cachedObject as Parameter).Value;
+                result = (cachedObject as Parameter).Value;
+                return true;
             }
             else if (cachedObject is Total)
             {
@@ -1371,18 +1444,18 @@ namespace FastReport
 
                 (cachedObject as Total).ExecuteTotal(val);
 
-                return val;
+                result = val;
+                return true;
             }
 
-            // calculate the expression
-            return CalcExpression(expression, value);
+            return false;
         }
 
-        private object ConvertToColumnDataType( object val, Type dataType, bool convertNulls)
+        private object ConvertToColumnDataType(object val, Type dataType, bool convertNulls)
         {
             if (val == null || val is DBNull)
             {
-                if (ConvertNulls || convertNulls)
+                if (convertNulls)
                     val = Converter.ConvertNull(dataType);
             }
             else
@@ -1418,33 +1491,24 @@ namespace FastReport
         /// </remarks>
         protected virtual object CalcExpression(string expression, Variant value)
         {
-            // try to calculate the expression
-            foreach (AssemblyDescriptor d in assemblies)
+            var expressionToLower = expression.ToLower();
+
+            if (expressionToLower == "true" || expressionToLower == "false")
             {
-                if (d.ContainsExpression(expression))
-                    return d.CalcExpression(expression, value);
+                expression = expressionToLower;
             }
 
-            // expression not found. Probably it was added after the start of the report.
-            // Compile new assembly containing this expression.
-            AssemblyDescriptor descriptor = new AssemblyDescriptor(this, CodeHelper.EmptyScript());
-            assemblies.Add(descriptor);
-            descriptor.AddObjects();
-            descriptor.AddSingleExpression(expression);
-            descriptor.AddFunctions();
-            descriptor.Compile();
-            return descriptor.CalcExpression(expression, value);
+            return CodeProvider.CalcExpression(expression, value);
         }
 
         /// <summary>
-        /// Invokes the script event handler with given name.
+        /// Invokes the script method with given name.
         /// </summary>
         /// <param name="name">The name of the script method.</param>
         /// <param name="parms">The method parameters.</param>
-        public void InvokeEvent(string name, object[] parms)
+        public object InvokeMethod(string name, object[] parms)
         {
-            if (assemblies.Count > 0)
-                assemblies[0].InvokeEvent(name, parms);
+            return CodeProvider.InvokeMethod(name, parms);
         }
 
         private Column GetColumn(string complexName)
@@ -1456,7 +1520,7 @@ namespace FastReport
             if (cachedItem != null)
                 return cachedItem.column;
 
-            string[] names = complexName.Split(new char[] { '.' });
+            string[] names = complexName.Split('.');
             cachedItem = cachedDataItems[names[0]] as CachedDataItem;
             DataSourceBase data = cachedItem != null ? cachedItem.dataSource : GetDataSource(names[0]);
 
@@ -1544,6 +1608,10 @@ namespace FastReport
                 {
                     return (double)(int)par.Value;
                 }
+                if (par.Value?.GetType() != par.DataType)
+                {
+                    return ConvertToColumnDataType(par.Value, par.DataType, Report.ConvertNulls);
+                }
                 return par.Value;
             }
             return null;
@@ -1584,6 +1652,32 @@ namespace FastReport
                 par.Value = value;
                 par.Expression = "";
             }
+
+            isParameterChanged = true;
+        }
+
+        /// <summary>
+        /// Sets the parameter's expression.
+        /// </summary>
+        /// <param name="complexName">The name of the parameter.</param>
+        /// <param name="expression">Epression to set. It must be a valid FR expression.</param>
+        /// <remarks>
+        /// This method is used to create an expression for a parameter.
+        /// If the specified parameter does not exist, it will be created with the specified expression.
+        /// <br>
+        /// <b>Expression must be a valid FR expression to avoid exceptions.</b>
+        /// </br>
+        /// </remarks>
+        public void SetParameterExpression(string complexName, string expression)
+        {
+            Parameter par = GetParameter(complexName) ?? DataHelper.CreateParameter(Dictionary, complexName);
+
+            if (par != null)
+            {
+                par.Expression = expression;
+            }
+
+            isParameterChanged = true;
         }
 
         /// <summary>
@@ -1629,9 +1723,9 @@ namespace FastReport
             return Dictionary.FindByAlias(alias) as DataSourceBase;
         }
 
-#endregion Script related
+        #endregion Script related
 
-#region Public Methods
+        #region Public Methods
 
         /// <inheritdoc/>
         public override void Assign(Base source)
@@ -1710,7 +1804,7 @@ namespace FastReport
             SetRunning(true);
             if (StartReport != null)
                 StartReport(this, e);
-            InvokeEvent(StartReportEvent, new object[] { this, e });
+            InvokeMethod(StartReportEvent, new object[] { this, e });
         }
 
         /// <summary>
@@ -1722,7 +1816,7 @@ namespace FastReport
             SetRunning(false);
             if (FinishReport != null)
                 FinishReport(this, e);
-            InvokeEvent(FinishReportEvent, new object[] { this, e });
+            InvokeMethod(FinishReportEvent, new object[] { this, e });
         }
 
         /// <summary>
@@ -1749,6 +1843,7 @@ namespace FastReport
             string[] assemblies = ReferencedAssemblies;
             Array.Resize(ref assemblies, assemblies.Length + 1);
             assemblies[assemblies.Length - 1] = assembly_name;
+            ReferencedAssemblies = assemblies;
         }
 
         /// <summary>
@@ -1764,6 +1859,7 @@ namespace FastReport
             {
                 assemblies[oldLength + i] = assembly_names[i];
             }
+            ReferencedAssemblies = assemblies;
         }
 
         /// <inheritdoc/>
@@ -1846,8 +1942,20 @@ namespace FastReport
         /// <param name="stream">The stream to save to.</param>
         public void Save(Stream stream)
         {
+            Save(stream, false);
+        }
+
+        /// <summary>
+        /// Saves the report to a stream.
+        /// </summary>
+        /// <param name="stream">The stream to save to.</param>
+        /// <param name="savePageLinks">Enables saving linked pages to original files.</param>
+        public void Save(Stream stream, bool savePageLinks)
+        {
             using (FRWriter writer = new FRWriter())
             {
+                writer.SaveExternalPages = savePageLinks;
+
                 if (IsAncestor)
                     writer.GetDiff += new DiffEventHandler(GetDiff);
                 writer.Write(this);
@@ -1887,18 +1995,68 @@ namespace FastReport
         }
 
         /// <summary>
+        /// Saves the report to a file.
+        /// </summary>
+        /// <param name="fileName">The name of the file to save to.</param>
+        /// <param name="savePageLinks">Enables saving linked pages to original files.</param>
+        public void Save(string fileName, bool savePageLinks)
+        {
+            FileName = fileName;
+            using (FileStream f = new FileStream(fileName, FileMode.Create))
+            {
+                Save(f, savePageLinks);
+            }
+        }
+
+        /// <summary>
+        /// Saves the report to a stream with randomized values in data sources.
+        /// </summary>
+        /// <param name="stream">The stream to save to.</param>
+        public void SaveWithRandomData(Stream stream)
+        {
+            FRRandom random = new FRRandom();
+            random.RandomizeDataSources(Dictionary.DataSources);
+            Save(stream);
+        }
+
+        /// <summary>
+        /// Saves the report to a file with randomized values in data sources.
+        /// </summary>
+        /// <param name="fileName">The name of the file to save to.</param>
+        public void SaveWithRandomData(string fileName)
+        {
+            FRRandom random = new FRRandom();
+            random.RandomizeDataSources(Dictionary.DataSources);
+            Save(fileName);
+        }
+
+        /// <summary>
         /// Loads report from a stream.
         /// </summary>
         /// <param name="stream">The stream to load from.</param>
         /// <remarks>
-        /// When you try to load the password-protected report, you will be asked
-        /// for a password. You also may specify the password in the <see cref="Password"/>
-        /// property before loading the report. In this case the report will load silently.
+        /// The stream must be seekable.
+        /// When you load a password-protected report, you should specify a password in the <see cref="Password"/> property,
+        /// otherwise you will get the <see cref="DecryptException"/>. In this case you should ask for a password and try again:
+        /// <code>
+        /// try
+        /// {
+        ///   report.Load(stream);
+        /// }
+        /// catch (DecryptException)
+        /// {
+        ///   report.Password = report.ShowPasswordForm(); // or use your own form to do this
+        ///   report.Load(stream);
+        /// }
+        /// </code>
         /// </remarks>
         public void Load(Stream stream)
         {
             string password = Password;
             Clear();
+
+            var saveStream = stream;
+            var saveStreamPos = stream.Position;
 
             using (FRReader reader = new FRReader(this))
             {
@@ -1911,10 +2069,6 @@ namespace FastReport
                 bool crypted = Crypter.IsStreamEncrypted(stream);
                 if (crypted)
                 {
-                    if (String.IsNullOrEmpty(password))
-                    {
-                        password = ShowPaswordForm(password);
-                    }
                     stream = Crypter.Decrypt(stream, password);
                     disposeList.Add(stream);
                 }
@@ -1926,7 +2080,10 @@ namespace FastReport
                 catch (Exception e)
                 {
                     if (crypted)
+                    {
+                        saveStream.Position = saveStreamPos;
                         throw new DecryptException();
+                    }
                     throw e;
                 }
                 finally
@@ -1975,21 +2132,20 @@ namespace FastReport
             if (String.IsNullOrEmpty(s))
                 return;
 
+            byte[] buffer;
             int startIndex = s.IndexOf("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
             if (startIndex != -1)
             {
-                UTF8Encoding encoding = new UTF8Encoding();
-                using (MemoryStream stream = new MemoryStream(encoding.GetBytes(s.Substring(startIndex))))
-                {
-                    Load(stream);
-                }
+                buffer = Encoding.UTF8.GetBytes(s.Substring(startIndex));
             }
             else
             {
-                using (MemoryStream stream = new MemoryStream(Convert.FromBase64String(s)))
-                {
-                    Load(stream);
-                }
+                buffer = Convert.FromBase64String(s);
+            }
+
+            using (MemoryStream stream = new MemoryStream(buffer))
+            {
+                Load(stream);
             }
         }
 
@@ -2001,7 +2157,7 @@ namespace FastReport
         {
             using (MemoryStream stream = new MemoryStream())
             {
-                Save(stream);
+                Save(stream, false);
 
                 if (Compressed || !String.IsNullOrEmpty(Password))
                 {
@@ -2009,8 +2165,29 @@ namespace FastReport
                 }
                 else
                 {
-                    UTF8Encoding encoding = new UTF8Encoding();
-                    return encoding.GetString(stream.ToArray());
+                    return Encoding.UTF8.GetString(stream.ToArray());
+                }
+            }
+        }
+
+        /// <summary>
+        /// Saves the report to a string.
+        /// </summary>
+        /// <returns>The string that contains a stream.</returns>
+        /// <param name="savePageLinks">Enables saving linked pages to original files.</param>
+        public string SaveToString(bool savePageLinks)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                Save(stream, savePageLinks);
+
+                if (Compressed || !String.IsNullOrEmpty(Password))
+                {
+                    return Convert.ToBase64String(stream.ToArray());
+                }
+                else
+                {
+                    return Encoding.UTF8.GetString(stream.ToArray());
                 }
             }
         }
@@ -2301,12 +2478,13 @@ namespace FastReport
             return Prepare(false);
         }
 
+
         /// <summary>
         /// Prepares the report.
         /// </summary>
         /// <param name="append">Specifies whether the new report should be added to a
         /// report that was prepared before.</param>
-        /// <returns><b>true</b> if report was prepared succesfully.</returns>
+        /// <returns><b>true</b> if report was prepared successfully.</returns>
         /// <remarks>
         /// Use this method to merge prepared reports.
         /// </remarks>
@@ -2321,6 +2499,31 @@ namespace FastReport
         /// </code>
         /// </example>
         public bool Prepare(bool append)
+        {
+            return Prepare(append, true);
+        }
+
+        /// <summary>
+        /// Prepares the report.
+        /// </summary>
+        /// <param name="append">Specifies whether the new report should be added to a
+        /// report that was prepared before.</param>
+        /// <param name="resetDataState">Specifies whether the reset data state.</param>
+        /// <returns><b>true</b> if report was prepared successfully.</returns>
+        /// <remarks>
+        /// Use this method to merge prepared reports.
+        /// </remarks>
+        /// <example>This example shows how to merge two reports and preview the result:
+        /// <code>
+        /// Report report = new Report();
+        /// report.Load("report1.frx");
+        /// report.Prepare();
+        /// report.Load("report2.frx");
+        /// report.Prepare(true);
+        /// report.ShowPrepared();
+        /// </code>
+        /// </example>
+        public bool Prepare(bool append, bool resetDataState)
         {
             SetRunning(true);
             try
@@ -2339,7 +2542,8 @@ namespace FastReport
                 try
                 {
                     Compile();
-                    return Engine.Run(true, append, true);
+                    isParameterChanged = false;
+                    return Engine.Run(true, append, resetDataState);
                 }
                 finally
                 {
@@ -2393,13 +2597,18 @@ namespace FastReport
         [EditorBrowsable(EditorBrowsableState.Never)]
         public void PreparePhase1()
         {
+            bool webDialog = false;
             SetRunning(true);
             if (preparedPages != null)
+            {
+                // if prepared pages are set before => it's call method again => it's web dialog
+                webDialog = true;
                 preparedPages.Clear();
+            }
             SetPreparedPages(new Preview.PreparedPages(this));
             engine = new ReportEngine(this);
             Compile();
-            Engine.RunPhase1();
+            Engine.RunPhase1(true, webDialog);
         }
 
         /// <summary>
@@ -2425,13 +2634,37 @@ namespace FastReport
         }
 
         /// <summary>
-        ///  Refresh prepared report after intercative actions.
+        ///  Refresh prepared report after interactive actions.
         /// </summary>
         public void InteractiveRefresh()
         {
             PreparedPages.ClearPageCache();
             InternalRefresh();
         }
+
+        /// <summary>
+        /// Serialize report object from string
+        /// </summary>
+        /// <returns>Serialized report object from string</returns>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public ReportComponentBase Xml(string xml)
+        {
+            XmlDocument doc = new XmlDocument();
+            using (TextReader reader = new StringReader(xml))
+            {
+                doc.WriteHeader = false;
+                doc.ReadHeader = true;
+                doc.Load(reader);
+
+            }
+            using (FRReader reader = new FRReader(this, doc.Root))
+            {
+
+                reader.DeserializeFrom = SerializeTo.Clipboard;
+                return reader.Read() as ReportComponentBase;
+            }
+        }
+
 
         internal void InternalRefresh()
         {
@@ -2489,6 +2722,20 @@ namespace FastReport
         }
 
         /// <summary>
+        /// Prepare page
+        /// </summary>
+        /// <param name="page"></param>
+        /// <param name="isDetailPage"> Flag indicating whether the page is a detail page. </param>
+        public void PreparePage(ReportPage page, bool isDetailPage)
+        {
+            bool pageVisible = page.Visible;
+            if (isDetailPage)
+                page.Visible = true;
+            PreparePage(page);
+            page.Visible = pageVisible;
+        }
+
+        /// <summary>
         /// Exports a report. Report should be prepared using the <see cref="Prepare()"/> method.
         /// </summary>
         /// <param name="export">The export filter.</param>
@@ -2534,6 +2781,7 @@ namespace FastReport
         /// <param name="fileName">File name to load form.</param>
         public void LoadPrepared(string fileName)
         {
+            isLoadPrepared = true;
             if (PreparedPages == null)
                 SetPreparedPages(new FastReport.Preview.PreparedPages(this));
             PreparedPages.Load(fileName);
@@ -2545,12 +2793,13 @@ namespace FastReport
         /// <param name="stream">Stream to load from.</param>
         public void LoadPrepared(Stream stream)
         {
+            isLoadPrepared = true;
             if (PreparedPages == null)
                 SetPreparedPages(new FastReport.Preview.PreparedPages(this));
             PreparedPages.Load(stream);
         }
 
-#endregion Public Methods
+        #endregion Public Methods
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Report"/> class with default settings.
@@ -2563,7 +2812,6 @@ namespace FastReport
             styles = new StyleCollection();
             Dictionary = new Dictionary();
             graphicCache = new GraphicCache();
-            assemblies = new AssemblyCollection();
             cachedDataItems = new Hashtable(StringComparer.InvariantCultureIgnoreCase); // needed for case insensitivity
             storeInResources = true;
             fileName = "";

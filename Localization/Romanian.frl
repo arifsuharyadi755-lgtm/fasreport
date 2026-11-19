@@ -101,6 +101,7 @@
     </Shapes>
     <PictureObject Text="Poza"/>
     <TableObject Text="Tabel"/>
+    <Matrix Text="Matrice"/>
     <MatrixObject Text="Matrice"/>
     <SubreportObject Text="Subraport"/>
     <BarcodeObject Text="Cod de bara"/>
@@ -149,7 +150,7 @@
     <MdbFile Text="Baza de date MS Access (*.mdb)|*.mdb"/>
     <MdfFile Text="Baza de date Microsoft SQL Serve (*.mdf)|*.mdf"/>
     <RtfFile Text="Fisier Rich Text (*.rtf)|*.rtf"/>
-    <Images Text="Fisier imagine|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Fisier imagine|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Assembly (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="Fisier de listareare (*.prn)|*.prn"/>
     <BmpFile Text="Imagine bitmap (*.bmp)|*.bmp"/>
@@ -1348,7 +1349,7 @@
       <InsertToRight Text="Insereaza o Coloana la Dreapta"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Uneste Celulele"/>
+      <Merge Text="Uneste Celulele"/>
       <Split Text="Imparte Celulele"/>
     </TableCell>
     <MatrixObject>
@@ -1497,14 +1498,14 @@
     <Ods Text="Exporta in Open Office Calc">
       <File Text="OpenOffice Calc"/>
     </Ods>
-    <Xlsx Text="Exporta in Excel 2007">
-      <File Text="Fisier Excel 2007"/>
+    <Xlsx Text="Exporta in Microsoft Excel">
+      <File Text="Fisier Microsoft Excel"/>
     </Xlsx>
-    <Pptx Text="Exporta in PowerPoint 2007">
-      <File Text="Fiseir PowerPoint 2007"/>
+    <Pptx Text="Exporta in Microsoft PowerPoint">
+      <File Text="Fiseir Microsoft PowerPoint"/>
     </Pptx>
-    <Docx Text="Exporta in Microsoft Word 2007">
-      <File Text="Fisier Microsoft Word 2007"/>
+    <Docx Text="Exporta in Microsoft Word">
+      <File Text="Fisier Microsoft Word"/>
     </Docx>
     <Xps Text="Exporta in XPS">
       <File Text="Fisier Microsoft XPS"/>

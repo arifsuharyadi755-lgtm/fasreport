@@ -1,12 +1,12 @@
-﻿using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
+﻿#if !WASM
+using FastReport.Web.Infrastructure;
+#endif
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
-using FastReport.Export;
 
 namespace FastReport.Web
 {
@@ -28,6 +28,13 @@ namespace FastReport.Web
 
         #region Static Methods
 
+        internal static bool ShouldExportUseZipFormat(IEnumerable<KeyValuePair<string, string>> exportParams, string exportFormat) 
+            => ShouldUseZipFormat(exportParams, ExportsFromFormat(exportFormat));
+        
+        internal static bool ShouldExportUseZipFormat(IEnumerable<KeyValuePair<string, string>> exportParams, Exports export) 
+            => ShouldUseZipFormat(exportParams, export);
+
+#if !WASM
         internal static string MapPath(string path)
         {
             if (path.IsNullOrWhiteSpace())
@@ -35,9 +42,9 @@ namespace FastReport.Web
 
             if (Path.IsPathRooted(path))
                 return path;
-
             return Path.Combine(FastReportGlobal.HostingEnvironment.ContentRootPath, path);
         }
+#endif
 
         internal static string ToUrl(params string[] segments)
         {
@@ -67,40 +74,6 @@ namespace FastReport.Web
         //        path.Replace("~/", ""));
         //}
 
-        internal static void CopyCookies(WebRequest request, HttpContext context)
-        {
-            CookieContainer cookieContainer = new CookieContainer();
-            UriBuilder uri = new UriBuilder
-            {
-                Scheme = context.Request.Scheme,
-                Host = context.Request.Host.Host
-            };
-
-            string ARRAffinity = GetWebsiteInstanceId();
-            if (!String.IsNullOrEmpty(ARRAffinity))
-                cookieContainer.Add(uri.Uri, new Cookie("ARRAffinity", ARRAffinity));
-
-            foreach (string key in context.Request.Cookies.Keys)
-                cookieContainer.Add(uri.Uri, new Cookie(key, WebUtility.UrlEncode(context.Request.Cookies[key])));
-
-            HttpWebRequest req = (HttpWebRequest)request;
-            req.CookieContainer = cookieContainer;
-        }
-
-        internal static string GetARRAffinity()
-        {
-            string id = GetWebsiteInstanceId();
-            if (!String.IsNullOrEmpty(id))
-                return String.Concat("&ARRAffinity=", id);
-            else
-                return String.Empty;
-        }
-
-        internal static string GetWebsiteInstanceId()
-        {
-            return Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID");
-        }
-
         internal static void Write(Stream stream, string value)
         {
             byte[] buf = Encoding.UTF8.GetBytes(value);
@@ -111,7 +84,7 @@ namespace FastReport.Web
         {
             byte[] pngHeader = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 };
             bool isPng = true;
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 8 && image.Length > 7; i++)
                 if (image[i] != pngHeader[i])
                 {
                     isPng = false;
@@ -119,6 +92,32 @@ namespace FastReport.Web
                 }
             return isPng;
         }
+        #endregion
+
+        #region PrivateMethods
+
+        private static bool ShouldUseZipFormat(IEnumerable<KeyValuePair<string, string>> exportParams,
+            Exports exportType)
+        {
+            var exportParamsList = exportParams.ToList();
+
+            var separateFilesParam = exportParamsList.Any(pair => pair is { Key: "SeparateFiles", Value: "true" });
+            var embedPicturesParam = exportParamsList.Any(pair => pair is { Key: "EmbedPictures", Value: "true" });
+
+            return (exportType == Exports.Image && (separateFilesParam || !exportParamsList.Any())) ||
+                   (exportType == Exports.HTML && !embedPicturesParam);
+        }
+
+        private static Exports ExportsFromFormat(string exportFormat)
+        {
+            return exportFormat switch
+            {
+                "image" => Exports.Image,
+                "html" => Exports.HTML,
+                _ => Exports.Text
+            };
+        }
+
         #endregion
     }
 

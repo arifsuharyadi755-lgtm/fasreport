@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using FastReport.Utils;
 
 namespace FastReport
@@ -54,11 +55,14 @@ namespace FastReport
             else
                 brush = Fill.CreateBrush(new RectangleF(x, y, dx, dy), e.ScaleX, e.ScaleY);
 
+            DrawUtils.SetPenDashPatternOrStyle(DashPattern, pen, Border);
+
             using (GraphicsPath path = getPolygonPath(pen, e.ScaleX, e.ScaleY))
             {
-                if(polygonSelectionMode == PolygonSelectionMode.MoveAndScale)
-                e.Graphics.FillPath(brush, path);
-                e.Graphics.DrawPath(pen, path);
+                if (polygonSelectionMode == PolygonSelectionMode.MoveAndScale)
+                    e.Graphics.FillAndDrawPath(pen, brush, path);
+                else
+                    e.Graphics.DrawPath(pen, path);
             }
         }
 

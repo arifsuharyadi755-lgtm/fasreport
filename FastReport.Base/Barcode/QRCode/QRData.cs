@@ -1,6 +1,8 @@
 ﻿using FastReport.Utils;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -30,30 +32,50 @@ namespace FastReport.Barcode.QRCode
 
         public static QRData Parse(string data)
         {
-            if (data.StartsWith("BEGIN:VCARD"))
-                return new QRvCard(data);
-            else if (data.StartsWith("MATMSG:"))
-                return new QREmailMessage(data);
-            else if (data.StartsWith("geo:"))
-                return new QRGeo(data);
-            else if (data.StartsWith("SMSTO:"))
-                return new QRSMS(data);
-            else if (data.StartsWith("tel:"))
-                return new QRCall(data);
-            else if (data.StartsWith("BEGIN:VEVENT"))
-                return new QREvent(data);
-            else if (data.StartsWith("WIFI:"))
-                return new QRWifi(data);
-            else if (Uri.IsWellFormedUriString(data, UriKind.Absolute))
-                return new QRURI(data);
-            else if (Regex.IsMatch(data, @"^([\w-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([\w-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$"))
-                return new QREmailAddress(data);
-            else if (data.StartsWith("SPC"))
-                return new QRSwiss(data);
-            else if (data.StartsWith("ST"))
-                return new QRSberBank(data);
-            else
-                return new QRText(data);
+            if(!string.IsNullOrEmpty(data))
+            {
+                if (QRvCard.TryParse(data, out QRData qrVCard))  // check for prefix "BEGIN:VCARD"
+                    return qrVCard;
+
+                else if (QREmailMessage.TryParse(data, out QRData qrEmailMessage)) // check for prefix "MATMSG:"
+                    return qrEmailMessage;
+
+                else if (QRGeo.TryParse(data, out QRData qrGeo)) // check for prefix "geo:"
+                    return qrGeo;
+
+                else if (QRSMS.TryParse(data, out QRData qrSMS)) // check for prefix "SMSTO:"
+                    return qrSMS;
+
+                else if (QRCall.TryParse(data, out QRData qrCall)) // check for prefix "tel:"
+                    return qrCall;
+
+                else if (QREvent.TryParse(data, out QRData qrEvent)) // check for prefix "BEGIN:VEVENT"
+                    return qrEvent;
+
+                else if (QRWifi.TryParse(data, out QRData qrWifi)) // check for prefix "WIFI:"
+                    return qrWifi;
+
+                else if (QREmailAddress.TryParse(data, out QRData qrEmailAddress)) // check by Regex
+                    return qrEmailAddress;
+
+                else if (QRSwiss.TryParse(data, out QRData qrSwiss)) // check for prefix "SPC"
+                    return qrSwiss;
+
+                else if (QRSberBank.TryParse(data, out QRData qrSber)) // check for prefix "ST"
+                    return qrSber;
+
+                else if (QRURI.TryParse(data, out QRData qrURI)) // check by Uri: Uri.IsWellFormedUriString(data, UriKind.Absolute)
+                    return qrURI;
+            }
+
+            // if we cant properly recognize the QR-code format, then we try to return QR with plain text either empty QR
+            QRText.TryParse(data, out QRData qrText);
+                return qrText;
+
+        }
+        protected static bool TryParse(string data, out QRData qrData)
+        {
+            throw new NotImplementedException("You should override this method in inheritance classes");
         }
     }
 
@@ -61,6 +83,18 @@ namespace FastReport.Barcode.QRCode
     {
         public QRText() : base() { }
         public QRText(string data) : base(data) { }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (!string.IsNullOrEmpty(data))
+            {
+                qrData = new QRText(data);
+                return true;
+            }
+
+            qrData = new QRText("");
+            return false;
+        }
     }
 
     class QRvCard : QRData
@@ -179,18 +213,64 @@ namespace FastReport.Barcode.QRCode
                 }
             }
         }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("BEGIN:VCARD"))
+            {
+                try
+                {
+                    qrData = new QRvCard(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+                }
+            }
+            qrData = null;
+            return false;
+        }
     }
 
     class QRURI : QRData
     {
         public QRURI() : base() { }
         public QRURI(string data) : base(data) { }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (Uri.IsWellFormedUriString(data, UriKind.Absolute))
+            {
+                qrData = new QRURI(data);
+                return true;
+            }
+            qrData = null;
+            return false;
+        }
     }
 
     class QREmailAddress : QRData
     {
         public QREmailAddress() : base() { }
         public QREmailAddress(string data) : base(data) { }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (Regex.IsMatch(data, @"^([\w-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([\w-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$"))
+            {
+                try
+                {
+                    qrData = new QREmailAddress(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+            qrData = null;
+            return false;
+        }
     }
 
     class QREmailMessage : QRData
@@ -216,15 +296,32 @@ namespace FastReport.Barcode.QRCode
             msg_sub = s[2];
             msg_body = s[3].Remove(s[3].Length - 2, 2);
         }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("MATMSG:"))
+            {
+                try
+                {
+                    qrData = new QREmailMessage(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+                }
+            }
+            qrData = null;
+            return false;
+        }
     }
 
     class QRSberBank : QRData
     {
         char Separator = '|';
 
-        private string FormatIdentifier="ST";
+        private string FormatIdentifier = "ST";
         public string VersionStandart = "0001";
-        public string Encoding="2";
+        public string Encoding = "2";
 
         #region necessary payment details 
         public string Name;
@@ -297,45 +394,45 @@ namespace FastReport.Barcode.QRCode
             result += Separator + "BankName=" + BankName;
             result += Separator + "BIC=" + BIC;
             result += Separator + "CorrespAcc=" + CorrespAcc;
-            if (!String.IsNullOrWhiteSpace(Sum))  result += Separator + "Sum=" + Sum;
+            if (!String.IsNullOrWhiteSpace(Sum)) result += Separator + "Sum=" + Sum;
             if (!String.IsNullOrWhiteSpace(Purpose)) result += Separator + "Purpose=" + Purpose;
             if (!String.IsNullOrWhiteSpace(PayeeINNB)) result += Separator + "PayeeINN=" + PayeeINNB;
             if (!String.IsNullOrWhiteSpace(PayerINN)) result += Separator + "PayerINN=" + PayerINN;
             if (!String.IsNullOrWhiteSpace(DrawerStatus)) result += Separator + "DrawerStatus=" + DrawerStatus;
-            if (!String.IsNullOrWhiteSpace(KPP)) result += Separator+ "KPP=" + KPP;
-            if(!String.IsNullOrWhiteSpace(CBC)) result += Separator+"CBC="+CBC;
+            if (!String.IsNullOrWhiteSpace(KPP)) result += Separator + "KPP=" + KPP;
+            if (!String.IsNullOrWhiteSpace(CBC)) result += Separator + "CBC=" + CBC;
             if (!String.IsNullOrWhiteSpace(OKTMO)) result += Separator + "OKTMO=" + OKTMO;
-            if (!String.IsNullOrWhiteSpace(PaytReason)) result += Separator + "PaytReason="+PaytReason;
-            if (!String.IsNullOrWhiteSpace(TaxPeriod)) result += Separator +"TaxPeriod="+TaxPeriod;
-            if (!String.IsNullOrWhiteSpace(DocNo)) result += Separator +"DocNo="+DocNo;
+            if (!String.IsNullOrWhiteSpace(PaytReason)) result += Separator + "PaytReason=" + PaytReason;
+            if (!String.IsNullOrWhiteSpace(TaxPeriod)) result += Separator + "TaxPeriod=" + TaxPeriod;
+            if (!String.IsNullOrWhiteSpace(DocNo)) result += Separator + "DocNo=" + DocNo;
             if (DocDate != DateTime.MinValue)
             {
                 result += Separator + "DocDate=" + DocDate.ToString("MM.dd.yyyy");
             }
             if (!String.IsNullOrWhiteSpace(TaxPaytKind)) result += Separator + "TaxPaytKind=" + TaxPaytKind;
             if (!String.IsNullOrWhiteSpace(LastName)) result += Separator + "LastName=" + LastName;
-            if (!String.IsNullOrWhiteSpace(FirstName)) result += Separator +"FirstName="+FirstName;
-            if (!String.IsNullOrWhiteSpace(MiddleName)) result += Separator +"MiddleName="+MiddleName;
-            if (!String.IsNullOrWhiteSpace(PayerAddress)) result += Separator +"PayerAddress="+PayerAddress;
-            if (!String.IsNullOrWhiteSpace(PersonalAccount)) result += Separator +"PersonalAccount="+PersonalAccount;
-            if (!String.IsNullOrWhiteSpace(DocIdx)) result += Separator + "DocIdx="+DocIdx;
-            if (!String.IsNullOrWhiteSpace(PensAcc)) result += Separator +"PensAcc="+PensAcc;
-            if (!String.IsNullOrWhiteSpace(Contract)) result += Separator +"Contract="+Contract;
-            if (!String.IsNullOrWhiteSpace(PersAccp)) result += Separator +"PersAcc="+PersAccp;
-            if (!String.IsNullOrWhiteSpace(Flat)) result += Separator +"Flat="+Flat;
-            if (!String.IsNullOrWhiteSpace(Phone)) result += Separator + "Phone=" + Phone; 
-            if (!String.IsNullOrWhiteSpace(PayerIdType)) result += Separator +"PayerIdType="+PayerIdType;
-            if (!String.IsNullOrWhiteSpace(PayerIdNum)) result += Separator +"PayerIdNum="+PayerIdNum;
-            if (!String.IsNullOrWhiteSpace(ChildFio)) result += Separator +"ChildFio="+ChildFio;
+            if (!String.IsNullOrWhiteSpace(FirstName)) result += Separator + "FirstName=" + FirstName;
+            if (!String.IsNullOrWhiteSpace(MiddleName)) result += Separator + "MiddleName=" + MiddleName;
+            if (!String.IsNullOrWhiteSpace(PayerAddress)) result += Separator + "PayerAddress=" + PayerAddress;
+            if (!String.IsNullOrWhiteSpace(PersonalAccount)) result += Separator + "PersonalAccount=" + PersonalAccount;
+            if (!String.IsNullOrWhiteSpace(DocIdx)) result += Separator + "DocIdx=" + DocIdx;
+            if (!String.IsNullOrWhiteSpace(PensAcc)) result += Separator + "PensAcc=" + PensAcc;
+            if (!String.IsNullOrWhiteSpace(Contract)) result += Separator + "Contract=" + Contract;
+            if (!String.IsNullOrWhiteSpace(PersAccp)) result += Separator + "PersAcc=" + PersAccp;
+            if (!String.IsNullOrWhiteSpace(Flat)) result += Separator + "Flat=" + Flat;
+            if (!String.IsNullOrWhiteSpace(Phone)) result += Separator + "Phone=" + Phone;
+            if (!String.IsNullOrWhiteSpace(PayerIdType)) result += Separator + "PayerIdType=" + PayerIdType;
+            if (!String.IsNullOrWhiteSpace(PayerIdNum)) result += Separator + "PayerIdNum=" + PayerIdNum;
+            if (!String.IsNullOrWhiteSpace(ChildFio)) result += Separator + "ChildFio=" + ChildFio;
             if (BirthDate != DateTime.MinValue)
             {
-                result+=Separator+"BirthDate="+BirthDate.ToString("MM.dd.yyyy");
+                result += Separator + "BirthDate=" + BirthDate.ToString("MM.dd.yyyy");
             }
-            if (PaymTerm!=DateTime.MinValue)
+            if (PaymTerm != DateTime.MinValue)
             {
-                result+=Separator+"PaymTerm="+PaymTerm.ToString("MM.dd.yyyy");
+                result += Separator + "PaymTerm=" + PaymTerm.ToString("MM.dd.yyyy");
             }
-            if (!String.IsNullOrWhiteSpace(PaymPeriod)) result += Separator +"PaymPeriod="+PaymPeriod;
+            if (!String.IsNullOrWhiteSpace(PaymPeriod)) result += Separator + "PaymPeriod=" + PaymPeriod;
             if (!String.IsNullOrWhiteSpace(Category)) result += Separator + "Category=" + Category;
             if (!String.IsNullOrWhiteSpace(ServiceName)) result += Separator + "ServiceName=" + ServiceName;
             if (!String.IsNullOrWhiteSpace(CounterId)) result += Separator + "CounterId=" + CounterId;
@@ -343,7 +440,7 @@ namespace FastReport.Barcode.QRCode
             if (!String.IsNullOrWhiteSpace(QuittId)) result += Separator + "QuittId=" + QuittId;
             if (QuittDate != DateTime.MinValue)
             {
-                result+=Separator+"QuittDate="+QuittDate.ToString("MM.dd.yyyy");
+                result += Separator + "QuittDate=" + QuittDate.ToString("MM.dd.yyyy");
             }
             if (!String.IsNullOrWhiteSpace(InstNum)) result += Separator + "InstNum=" + InstNum;
             if (!String.IsNullOrWhiteSpace(ClassNum)) result += Separator + "ClassNum=" + ClassNum;
@@ -354,15 +451,15 @@ namespace FastReport.Barcode.QRCode
             if (!String.IsNullOrWhiteSpace(RegType)) result += Separator + "RegType=" + RegType;
             if (!String.IsNullOrWhiteSpace(UIN)) result += Separator + "UIN=" + UIN;
             if (!String.IsNullOrWhiteSpace(TechCode)) result += Separator + "TechCode=" + TechCode;
-                return result;
+            return result;
         }
         public override void Unpack(string data)
         {
             data = RetrieveServiceData(data);
             string[] splitedString = data.Split(Separator);
-            foreach(string str in splitedString)
+            foreach (string str in splitedString)
             {
-                string[] splitedStr = str.Split(new string[] { "=" }, 2,StringSplitOptions.RemoveEmptyEntries);
+                string[] splitedStr = str.Split(new string[] { "=" }, 2, StringSplitOptions.RemoveEmptyEntries);
                 switch (splitedStr[0])
                 {
                     case "Name":
@@ -531,7 +628,26 @@ namespace FastReport.Barcode.QRCode
 
             return data;
         }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("ST"))
+            {
+                try
+                {
+                    qrData = new QRSberBank(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+            qrData = null;
+            return false;
+        }
     }
+
     class QRGeo : QRData
     {
         public string latitude;
@@ -554,6 +670,24 @@ namespace FastReport.Barcode.QRCode
             latitude = s[1];
             longitude = s[2];
             meters = s[3];
+        }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("geo:"))
+            {
+                try
+                {
+                    qrData = new QRGeo(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    
+                }
+            }
+            qrData = null;
+            return false;
         }
     }
 
@@ -578,6 +712,23 @@ namespace FastReport.Barcode.QRCode
             sms_to = s[1];
             sms_text = s[2];
         }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("SMSTO:"))
+            {
+                try
+                {
+                    qrData = new QRSMS(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+                }
+            }
+            qrData = null;
+            return false;
+        }
     }
 
     class QRCall : QRData
@@ -596,6 +747,24 @@ namespace FastReport.Barcode.QRCode
         public override void Unpack(string data)
         {
             tel = data.Remove(0, 4);
+        }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("tel:"))
+            {
+                try
+                {
+                    qrData = new QRCall(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+            qrData = null;
+            return false;
         }
     }
 
@@ -665,6 +834,24 @@ namespace FastReport.Barcode.QRCode
                                  int.Parse(To.Substring(11, 2)),
                                  int.Parse(To.Substring(13, 2)));
         }
+
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("BEGIN:VEVENT"))
+            {
+                try
+                {
+                    qrData = new QREvent(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+            qrData = null;
+            return false;
+        }
     }
 
     class QRWifi : QRData
@@ -694,17 +881,34 @@ namespace FastReport.Barcode.QRCode
             password = s[3];
             hidden = s[4] == "true;" ? true : false;
         }
-    }
 
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("WIFI:"))
+            {
+                try
+                {
+                    qrData = new QRWifi(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+            qrData = null;
+            return false;
+        }
+    }
 
     class QRSwiss : QRData
     {
         private string br = "\r\n";
         private string alternativeProcedure1, alternativeProcedure2;
         private Iban iban;
-        private decimal? amount;
+        private string amount;
         private Contact creditor, ultimateCreditor, debitor;
-        private Currency currency;
+        private string currency;
         private Reference reference;
         private AdditionalInformation additionalInformation;
         private MyRes res;
@@ -712,8 +916,8 @@ namespace FastReport.Barcode.QRCode
         public Iban _Iban { get { return iban; } set { iban = value; } }
         public Contact Creditor { get { return creditor; } set { creditor = value; } }
         public Contact Debitor { get { return debitor; } set { debitor = value; } }
-        public Decimal? Amount { get { return amount; } }
-        public Currency _Currency { get { return currency; } set { currency = value; } }
+        public string Amount { get { return amount; } }
+        public string _Currency { get { return currency; } set { currency = value; } }
         public Reference _Reference { get { return reference; } set { reference = value; } }
         public AdditionalInformation _AdditionalInformation { get { return additionalInformation; } set { additionalInformation = value; } }
         public string AlternativeProcedure1 { get { return alternativeProcedure1; } set { alternativeProcedure1 = value; } }
@@ -741,11 +945,55 @@ namespace FastReport.Barcode.QRCode
             this.creditor = parameters.Creditor;
             this.additionalInformation = parameters.AdditionalInformation != null ? parameters.AdditionalInformation : new AdditionalInformation(null, null);
 
-            if (parameters.Amount != null && parameters.Amount.ToString().Length > 12)
-                throw new SwissQrCodeException(res.Get("SwissAmountLength"));
+            if (!String.IsNullOrEmpty(parameters.Amount))
+                if (!parameters.Amount.StartsWith("[") || !parameters.Amount.EndsWith("]"))
+                {
+                    //Amount has to use . as decimal separator in any case. See https://www.paymentstandards.ch/dam/downloads/ig-qr-bill-en.pdf page 27.
+                    decimal.TryParse(parameters.Amount, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal decAmount);
+                    decimal roundedAmount = decimal.Round(decAmount, 2, MidpointRounding.AwayFromZero);
+
+                    // if the parameters.Amount contains "0", or "0.", or ".0"
+                    if (Regex.IsMatch(parameters.Amount, @"^0(\.0+)?$"))
+                    {
+                        roundedAmount = 0m;
+                    }
+                    else
+                    {
+                        // If the rounded number is less than or equal to 0, then set it to the minimum allowed value
+                        if (roundedAmount <= 0)
+                        {
+                            roundedAmount = 0.01m;
+                        }
+
+                        // If the rounded number is greater than 999999999.99, then set it to the maximum allowed value
+                        if (roundedAmount > 999999999.99m)
+                        {
+                            roundedAmount = 999999999.99m;
+                        }
+                    }
+
+                    parameters.Amount = roundedAmount.ToString("0.00", CultureInfo.InvariantCulture);
+
+                    // in theory, this check is no longer needed
+                    // if (parameters.Amount.Length > 12)
+                    //    throw new SwissQrCodeException(res.Get("SwissAmountLength"));
+                }
             this.amount = parameters.Amount;
 
-            this.currency = parameters.Currency.Value;
+            switch (parameters.Currency)
+            {
+                case nameof(Currency.EUR):
+                    parameters.Currency = Currency.EUR.ToString();
+                    break;
+                case nameof(Currency.CHF):
+                    parameters.Currency = Currency.CHF.ToString();
+                    break;
+                default:
+                    if (!parameters.Currency.StartsWith("[") || !parameters.Currency.EndsWith("]"))
+                        parameters.Currency = Currency.EUR.ToString();
+                    break;
+            }
+            this.currency = parameters.Currency;
             this.debitor = parameters.Debitor;
 
             if (iban.IsQrIban && parameters.Reference.RefType != Reference.ReferenceType.QRR)
@@ -764,24 +1012,15 @@ namespace FastReport.Barcode.QRCode
 
         public override void Unpack(string data)
         {
-            string[] datasWithR = data.Split('\n');
-            string datass = "";
-            foreach (string s in datasWithR)
-            {
-                datass += s;
-            }
-            string[] datas = datass.Split('\r');
-
-            List<string> vs = new List<string>();
+            string[] separators = { "\r\n", "\n" };
+            string[] datas = data.Split(separators, StringSplitOptions.None);
 
             int counter = 3;
 
-            string infoString = "";
-
             this.iban = new Iban(datas[counter]);
             counter++;
-            infoString = "";
 
+            string infoString = "";
             for (int i = counter; i < counter + 7; i++)
             {
                 infoString += datas[i] + '\r';
@@ -800,16 +1039,31 @@ namespace FastReport.Barcode.QRCode
                 this.ultimateCreditor = new Contact(infoString);
             }
             counter += 7;
-            this.amount = datas[counter] == String.Empty ? amount = null : Decimal.Parse(datas[counter].Replace('.', ','));
+            if (!datas[counter].StartsWith("[") || !datas[counter].EndsWith("]"))
+            {
+                //Amount has to use . as decimal separator in any case. See https://www.paymentstandards.ch/dam/downloads/ig-qr-bill-en.pdf page 27.
+                string invariantSeparator = CultureInfo.InvariantCulture.NumberFormat.NumberDecimalSeparator;
+                string clearQRSwissAmount = datas[counter].Replace(",", invariantSeparator).Replace("/", invariantSeparator);
+
+                decimal.TryParse(clearQRSwissAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal decAmount);
+                amount = datas[counter] == String.Empty ? amount = null : decAmount.ToString(CultureInfo.InvariantCulture);
+            }
+            else amount = datas[counter] == String.Empty ? amount = null : datas[counter];
             counter++;
 
             switch (datas[counter])
             {
-                case "EUR":
-                    this.currency = Currency.EUR;
+                case nameof(Currency.EUR):
+                    this.currency = Currency.EUR.ToString();
                     break;
-                case "CHF":
-                    this.currency = Currency.CHF;
+                case nameof(Currency.CHF):
+                    this.currency = Currency.CHF.ToString();
+                    break;
+                default:
+                    if (datas[counter].StartsWith("[") && datas[counter].EndsWith("]"))
+                        currency = datas[counter];
+                    else
+                        currency = Currency.EUR.ToString();
                     break;
             }
             counter++;
@@ -837,12 +1091,24 @@ namespace FastReport.Barcode.QRCode
                 iban.TypeIban = Iban.IbanType.Iban;
             if (!String.IsNullOrEmpty(reference.ReferenceText))
             {
-                if (reference.ChecksumMod10(reference.ReferenceText))
-                    reference._ReferenceTextType = Reference.ReferenceTextType.QrReference;
-                else if (Regex.IsMatch(reference.ReferenceText, @"^[0-9]+$"))
-                    reference._ReferenceTextType = Reference.ReferenceTextType.CreditorReferenceIso11649;
+                if (reference.ReferenceText.StartsWith("[") && reference.ReferenceText.EndsWith("]"))
+                {
+                    if (reference.RefType == Reference.ReferenceType.QRR)
+                        reference._ReferenceTextType = Reference.ReferenceTextType.QrReference;
+                    else
+                        reference._ReferenceTextType = Reference.ReferenceTextType.CreditorReferenceIso11649;
+                }
+                else
+                {
+                    if (reference.ChecksumMod10(reference.ReferenceText))
+                        reference._ReferenceTextType = Reference.ReferenceTextType.QrReference;
+                    else if (Regex.IsMatch(reference.ReferenceText, "^[a-zA-Z0-9 ]+$"))
+                        reference._ReferenceTextType = Reference.ReferenceTextType.CreditorReferenceIso11649;
+                }
             }
 
+            if (!iban._Iban.StartsWith("[") || !iban._Iban.EndsWith("]"))
+                iban = new Iban(iban._Iban, iban.TypeIban);
 
 
             counter += 2;
@@ -850,7 +1116,9 @@ namespace FastReport.Barcode.QRCode
             infoString = String.Empty;
             for (int i = counter; i < counter + 3; i++)
             {
-                infoString += datas[i] + '\r';
+                // this condition is necessary for the case when there are no more data after the EPD trailer, including empty lines
+                if (i < datas.Length)
+                    infoString += datas[i] + '\r';
             }
             this.additionalInformation = new AdditionalInformation(infoString);
             counter += 3;
@@ -890,17 +1158,8 @@ namespace FastReport.Barcode.QRCode
 
 
             //CcyAmtDate "logical" element
-            //Amoutn has to use . as decimal seperator in any case. See https://www.paymentstandards.ch/dam/downloads/ig-qr-bill-en.pdf page 27.
-            //SwissQrCodePayload += (amount != null ? amount.ToString().Replace(",", ".") : string.Empty) + br; //Amt
             if (amount != null)
-            {
-                string strAmount = amount.ToString();
-                if (!strAmount.Contains("."))
-                    strAmount = amount.ToString().Replace(",", ".");
-                else
-                    strAmount += ".00";
-                SwissQrCodePayload += strAmount;
-            }
+                SwissQrCodePayload += amount;
             else
                 SwissQrCodePayload += string.Empty;
             SwissQrCodePayload += br;
@@ -919,7 +1178,17 @@ namespace FastReport.Barcode.QRCode
 
             //RmtInf "logical" element
             SwissQrCodePayload += reference.RefType.ToString() + br; //Tp
-            SwissQrCodePayload += (!string.IsNullOrEmpty(reference.ReferenceText) ? reference.ReferenceText : string.Empty) + br; //Ref
+            if (!string.IsNullOrEmpty(reference.ReferenceText))
+            {
+                if (reference.ReferenceText.StartsWith("[") && reference.ReferenceText.EndsWith("]"))
+                    SwissQrCodePayload += reference.ReferenceText + br;
+                else
+                    SwissQrCodePayload += new string(reference.ReferenceText.Where(c => char.IsLetterOrDigit(c)).ToArray()).ToUpper() + br; //Ref
+            }
+            else
+            {
+                SwissQrCodePayload += string.Empty + br; //Ref
+            }
 
 
             //AddInf "logical" element
@@ -932,13 +1201,30 @@ namespace FastReport.Barcode.QRCode
                 SwissQrCodePayload += alternativeProcedure1.Replace("\n", "") + br; //AltPmt
             if (!string.IsNullOrEmpty(alternativeProcedure2))
                 SwissQrCodePayload += alternativeProcedure2.Replace("\n", "") + br; //AltPmt
-
-            //S-QR specification 2.0, chapter 4.2.3
-            if (SwissQrCodePayload.EndsWith(br))
-                SwissQrCodePayload = SwissQrCodePayload.Remove(SwissQrCodePayload.Length - br.Length);
+           
+            // removes all unnecessary \r\n at the end of the string,
+            // according to https://www.six-group.com/dam/download/banking-services/standardization/qr-bill/ig-qr-bill-v2.3-en.pdf section 4.1.4 (page 31)
+            SwissQrCodePayload = SwissQrCodePayload.TrimEnd(br.ToCharArray());
 
             return SwissQrCodePayload;
         }
 
+        public static new bool TryParse(string data, out QRData qrData)
+        {
+            if (data.StartsWith("SPC"))
+            {
+                try
+                {
+                    qrData = new QRSwiss(data);
+                    return true;
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+            qrData = null;
+            return false;
+        }
     }
 }

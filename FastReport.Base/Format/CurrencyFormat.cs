@@ -164,26 +164,20 @@ namespace FastReport.Format
             if (value is Variant)
                 value = ((Variant)value).Value;
 
-            return String.Format(GetNumberFormatInfo(), "{0:c}", new object[] { value });
+            return String.Format(GetNumberFormatInfo(), "{0:c}", value);
         }
 
         internal NumberFormatInfo GetNumberFormatInfo()
         {
-
-            NumberFormatInfo info = new NumberFormatInfo();
+            NumberFormatInfo info;
             if (UseLocale)
             {
-                NumberFormatInfo cultureFormat = CultureInfo.CurrentCulture.NumberFormat;
+                info = (NumberFormatInfo)CultureInfo.CurrentCulture.NumberFormat.Clone();
                 info.CurrencyDecimalDigits = DecimalDigits;
-                info.CurrencyDecimalSeparator = cultureFormat.CurrencyDecimalSeparator;
-                info.CurrencyGroupSizes = cultureFormat.CurrencyGroupSizes;
-                info.CurrencyGroupSeparator = cultureFormat.CurrencyGroupSeparator;
-                info.CurrencySymbol = cultureFormat.CurrencySymbol;
-                info.CurrencyPositivePattern = cultureFormat.CurrencyPositivePattern;
-                info.CurrencyNegativePattern = cultureFormat.CurrencyNegativePattern;
             }
             else
             {
+                info = new NumberFormatInfo();
                 info.CurrencyDecimalDigits = DecimalDigits;
                 info.CurrencyDecimalSeparator = DecimalSeparator;
                 info.CurrencyGroupSizes = new int[] { 3 };
@@ -232,10 +226,10 @@ namespace FastReport.Format
         public CurrencyFormat()
         {
             UseLocale = true;
-            DecimalDigits = 2;
-            DecimalSeparator = ".";
-            GroupSeparator = ",";
-            CurrencySymbol = "$";
+            DecimalDigits = CultureInfo.CurrentCulture.NumberFormat.CurrencyDecimalDigits;
+            DecimalSeparator = CultureInfo.CurrentCulture.NumberFormat.CurrencyDecimalSeparator;
+            GroupSeparator = CultureInfo.CurrentCulture.NumberFormat.CurrencyGroupSeparator;
+            CurrencySymbol = CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol;
         }
     }
 }

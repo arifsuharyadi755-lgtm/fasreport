@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -72,6 +73,13 @@ namespace FastReport.Export.Image
         private float zoomX;
         private float zoomY;
         private System.Drawing.Drawing2D.GraphicsState state;
+        private string imageExtensionFormat;
+        private string documentTitle;
+
+        private bool saveStreams;
+
+        const float DIVIDER = 0.75f;
+        const float PAGE_DIVIDER = 2.8346400000000003f; // mm to point
 
         #region Properties
         /// <summary>
@@ -91,6 +99,7 @@ namespace FastReport.Export.Image
         /// If this property is set to <b>false</b>, the export filter will produce one big image
         /// containing all exported pages. Be careful using this property with a big report
         /// because it may produce out of memory error.
+        /// And also when using Memory Stream and the value is true, an exception will be thrown.
         /// </remarks>
         public bool SeparateFiles
         {
@@ -206,6 +215,16 @@ namespace FastReport.Export.Image
         {
             get { return ImageFormat == ImageExportFormat.Tiff && MultiFrameTiff; }
         }
+
+        /// <summary>
+        /// Enable or disable saving streams in GeneratedStreams collection.
+        /// </summary>
+        public bool SaveStreams
+        {
+            get { return saveStreams; }
+            set { saveStreams = value; }
+        }
+
         #endregion
 
         #region Private Methods
@@ -216,11 +235,24 @@ namespace FastReport.Export.Image
                 return CreateMetafile(suffix);
             return new Bitmap(width, height);
         }
+        private void GeneratedUpdate(string filename, Stream stream)
+        {
+            int i = GeneratedFiles.IndexOf(filename);
+            if (i == -1)
+            {
+                GeneratedFiles.Add(filename);
+                GeneratedStreams.Add(stream);
+            }
+            else
+            {
+                GeneratedStreams[i] = stream;
+            }
+        }
 
         private System.Drawing.Image CreateMetafile(string suffix)
         {
             string extension = Path.GetExtension(FileName);
-            string fileName = Path.ChangeExtension(FileName, suffix + extension);
+            string targetFileName = Path.ChangeExtension(FileName, suffix + extension);
 
             System.Drawing.Image image;
             using (Bitmap bmp = new Bitmap(1, 1))
@@ -231,9 +263,9 @@ namespace FastReport.Export.Image
                     image = new Metafile(Stream, hdc);
                 else
                 {
-                    image = new Metafile(fileName, hdc);
-                    if (!GeneratedFiles.Contains(fileName))
-                        GeneratedFiles.Add(fileName);
+                    image = new Metafile(targetFileName, hdc);
+                    if (!GeneratedFiles.Contains(targetFileName))
+                        GeneratedFiles.Add(targetFileName);
                 }
                 g.ReleaseHdc(hdc);
             }
@@ -379,15 +411,33 @@ namespace FastReport.Export.Image
             }
             else if (ImageFormat != ImageExportFormat.Metafile)
             {
-                string extension = Path.GetExtension(FileName);
-                string fileName = Path.ChangeExtension(FileName, suffix + extension);
-                // empty suffix means that we should use the Stream that was created in the ExportBase
-                Stream stream = suffix == "" ? Stream : new FileStream(fileName, FileMode.Create);
-                if (suffix != "")
-                    GeneratedFiles.Add(fileName);
+                Stream stream;
+                string targetFileName;
+                if (saveStreams)
+                {
+                    targetFileName = string.IsNullOrEmpty(suffix)
+                        ? Path.ChangeExtension(documentTitle, imageExtensionFormat) 
+                        : Path.ChangeExtension(documentTitle + $" ({suffix})", imageExtensionFormat);
+                    stream = new MemoryStream();
+                }
+                else
+                {
+                    string extension = Path.GetExtension(FileName);
+                    targetFileName = Path.ChangeExtension(FileName, suffix + extension);
+
+                    // empty suffix means that we should use the Stream that was created in the ExportBase
+                    stream = suffix == "" ? Stream : new FileStream(targetFileName, FileMode.Create);
+
+                    if (suffix != "")
+                    {
+                        GeneratedFiles.Add(targetFileName);
+                    }
+                }
 
                 if (ImageFormat == ImageExportFormat.Jpeg)
+                {
                     ExportUtils.SaveJpeg(image, stream, JpegQuality);
+                }
                 else if (ImageFormat == ImageExportFormat.Tiff && MonochromeTiff)
                 {
                     // handle monochrome tiff separately
@@ -420,7 +470,9 @@ namespace FastReport.Export.Image
                     image.Save(stream, format);
                 }
 
-                if (suffix != "")
+                if (saveStreams)
+                    GeneratedUpdate(targetFileName, stream);
+                else if (suffix != "")
                     stream.Dispose();
             }
 
@@ -443,6 +495,8 @@ namespace FastReport.Export.Image
             base.Start();
 
             //init
+            SeparateFiles = Stream is MemoryStream ? false : SeparateFiles;
+            GeneratedStreams = new List<Stream>();
             pageNumber = 0;
             height = 0;
             width = 0;
@@ -455,6 +509,13 @@ namespace FastReport.Export.Image
             curOriginY = 0;
             firstPage = true;
 
+            if (saveStreams)
+            {
+                imageExtensionFormat = ImageFormat.ToString();
+                separateFiles = true;
+                documentTitle = !String.IsNullOrEmpty(Report.ReportInfo.Name) ?
+                    Report.ReportInfo.Name : Path.GetFileNameWithoutExtension(Report.FileName);
+            }
             if (!SeparateFiles && !IsMultiFrameTiff)
             {
                 // create one big image. To do this, calculate max width and sum of pages height
@@ -503,7 +564,7 @@ namespace FastReport.Export.Image
             else
                 g = Graphics.FromImage(image);
 
-            state = g.Save(); 
+            state = g.Save();
 
             g.FillRegion(Brushes.Transparent, new Region(new RectangleF(0, curOriginY, width, height)));
             if (bigImage != null && curOriginY + height * 2 > bigImage.Height)
@@ -532,10 +593,24 @@ namespace FastReport.Export.Image
                 AddImageWatermark(page);
             if (page.Watermark.Enabled && !page.Watermark.ShowTextOnTop)
                 AddTextWatermark(page);
+
+            // page borders
+            if (page.Border.Lines != BorderLines.None)
+            {
+                using (TextObject pageBorder = new TextObject())
+                {
+                    pageBorder.Border = page.Border;
+                    pageBorder.Left = 0;
+                    pageBorder.Top = 0;
+                    pageBorder.Width = (ExportUtils.GetPageWidth(page) - page.LeftMargin - page.RightMargin) * PAGE_DIVIDER / DIVIDER;
+                    pageBorder.Height = (ExportUtils.GetPageHeight(page) - page.TopMargin - page.BottomMargin) * PAGE_DIVIDER / DIVIDER;
+                    ExportObj(pageBorder);
+                }
+            }
         }
 
         /// <inheritdoc/>
-        protected override void ExportBand(Base band)
+        protected override void ExportBand(BandBase band)
         {
             base.ExportBand(band);
             ExportObj(band);
@@ -634,7 +709,7 @@ namespace FastReport.Export.Image
         /// </summary>
         public ImageExport()
         {
-            paddingNonSeparatePages = 10;
+            paddingNonSeparatePages = 0;
             fileSuffix = String.Empty;
             HasMultipleFiles = true;
             imageFormat = ImageExportFormat.Jpeg;
@@ -642,6 +717,7 @@ namespace FastReport.Export.Image
             Resolution = 96;
             jpegQuality = 100;
             monochromeTiffCompression = EncoderValue.CompressionCCITT4;
+            saveStreams = false;
         }
     }
 }

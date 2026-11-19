@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using Microsoft.AspNetCore.Html;
 using System.Threading.Tasks;
 using System.Linq;
-using FastReport.Web.Controllers;
 using FastReport.Web.Application;
 using System.Drawing;
+using System.ComponentModel;
+#if !WASM
+using FastReport.Web.Cache;
+#endif
 
 namespace FastReport.Web
 {
@@ -24,12 +26,8 @@ namespace FastReport.Web
 
     public partial class WebReport
     {
-        private string localizationFile;
-
 #if DIALOGS
-        internal Dialog Dialog {
-            get;
-        }
+        internal Dialog Dialog { get; }
 #endif
 
 #region Public Properties
@@ -51,51 +49,19 @@ namespace FastReport.Web
         /// </summary>
         public Report Report
         {
-            get => Tabs[CurrentTabIndex].Report;
+            get => Tabs[CurrentTabIndex].Report; 
             set => Tabs[CurrentTabIndex].Report = value;
         }
 
-        /// <summary>
-        /// Gets or sets the WebReport's locale
-        /// </summary>
-        public string LocalizationFile
-        {
-            get => localizationFile;
-            set
-            {
-                localizationFile = value;
-                string path = WebUtils.MapPath(localizationFile);
-                Res.LoadLocale(path);
-            }
-        }
-
-        internal WebRes Res { get; set; } = new WebRes();
+#if WASM
+        [Obsolete("Doesn't support in Wasm. Please, use SetLocalization(Stream) instead", true)]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public string LocalizationFile { get; set; }
+#endif
 
 
-        /// <summary>
-        /// Active report tab
-        /// </summary>
-        public ReportTab CurrentTab
-        {
-            get => Tabs[CurrentTabIndex];
-            set => Tabs[CurrentTabIndex] = value;
-        }
+        internal IWebRes Res { get; } = new WebRes();
 
-        /// <summary>
-        /// Active tab index
-        /// </summary>
-        public int CurrentTabIndex
-        {
-            get
-            {
-                if (currentTabIndex >= Tabs.Count)
-                    currentTabIndex = Tabs.Count - 1;
-                if (currentTabIndex < 0)
-                    currentTabIndex = 0;
-                return currentTabIndex;
-            }
-            set => currentTabIndex = value;
-        }
 
         /// <summary>
         /// Page index of current report
@@ -131,12 +97,7 @@ namespace FastReport.Web
         public int TotalPages => Report?.PreparedPages?.Count ?? 0;
 
         /// <summary>
-        /// List of report tabs
-        /// </summary>
-        public ReportTabCollection Tabs { get; } = new ReportTabCollection() { new ReportTab() { Report = new Report(), Closeable = false } };
-
-        /// <summary>
-        /// Switches beetwen Preview and Designer modes
+        /// Switches between Preview and Designer modes
         /// </summary>
         public WebReportMode Mode { get; set; } = WebReportMode.Preview;
 
@@ -153,7 +114,6 @@ namespace FastReport.Web
         public bool Pictures { get; set; } = true;
         public bool EmbedPictures { get; set; } = false;
 
-
         #region ToolbarSettings
 
         /// <summary>
@@ -163,39 +123,58 @@ namespace FastReport.Web
 
 
         [Obsolete("Please, use Toolbar.Show")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowToolbar { get => Toolbar.Show; set => Toolbar.Show = value; }
         [Obsolete("Please, use Toolbar.ShowPrevButton")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowPrevButton { get => Toolbar.ShowPrevButton; set => Toolbar.ShowPrevButton = value; }
         [Obsolete("Please, use Toolbar.ShowNextButton")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowNextButton { get => Toolbar.ShowNextButton; set => Toolbar.ShowNextButton = value; }
         [Obsolete("Please, use Toolbar.ShowFirstButton")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowFirstButton { get => Toolbar.ShowFirstButton; set => Toolbar.ShowFirstButton = value; }
         [Obsolete("Please, use Toolbar.ShowLastButton")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowLastButton { get => Toolbar.ShowLastButton; set => Toolbar.ShowLastButton = value; }
 
         [Obsolete("Please, use Toolbar.Exports.Show")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowExports { get => Toolbar.Exports.Show; set => Toolbar.Exports.Show = value; }
 
         [Obsolete("Please, use Toolbar.ShowRefreshButton")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowRefreshButton { get => Toolbar.ShowRefreshButton; set => Toolbar.ShowRefreshButton = value; }
         [Obsolete("Please, use Toolbar.ShowZoomButton")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowZoomButton { get => Toolbar.ShowZoomButton; set => Toolbar.ShowZoomButton = value; }
 
         [Obsolete("Please, use Toolbar.ShowPrint")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowPrint { get => Toolbar.ShowPrint; set => Toolbar.ShowPrint = value; }
         [Obsolete("Please, use Toolbar.PrintInHtml")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool PrintInHtml { get => Toolbar.PrintInHtml; set => Toolbar.PrintInHtml = value; }
 #if !OPENSOURCE
         [Obsolete("Please, use Toolbar.PrintInPdf")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool PrintInPdf { get => Toolbar.PrintInPdf; set => Toolbar.PrintInPdf = value; }
 #endif
 
         [Obsolete("Please, use Toolbar.Position")]
-      
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool ShowBottomToolbar { get => Toolbar.ShowBottomToolbar; set => Toolbar.ShowBottomToolbar = value; }
 
-
+        [Obsolete("Please, use Toolbar.Color")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public Color ToolbarColor { get => Toolbar.Color; set => Toolbar.Color = value; }
+
+        /// <summary>
+        /// Toolbar height in pixels
+        /// </summary>
+        [Obsolete("Please, use Toolbar.Height")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public int ToolbarHeight { get => Toolbar.Height; set => Toolbar.Height = value; }
 
         #endregion
 
@@ -218,26 +197,27 @@ namespace FastReport.Web
 
 #region Non-public
 
-        // TODO
-        private string ReportFile { get; set; } = null;
-        private string ReportPath { get; set; } = null;
-        private string ReportResourceString { get; set; } = null;
-
-        /// <summary>
-        /// Toolbar height in pixels
-        /// </summary>
-        public int ToolbarHeight { get; set; } = 40;
-
         internal readonly Dictionary<string, byte[]> PictureCache = new Dictionary<string, byte[]>();
-        int currentTabIndex;
 
-#endregion
+        internal string InlineStyle
+        {
+            get
+            {
+                if (Inline)
+                    return "inline-flex";
+                return "flex";
+            }
+        }
+
+        #endregion
 
         public WebReport()
         {
+#if !WASM
             string path = WebUtils.MapPath(LocalizationFile);
             Res.LoadLocale(path);
-            WebReportCache.Instance.Add(this);
+            WebReportCache.Instance?.Add(this);
+#endif
 #if DIALOGS
             Dialog = new Dialog(this);
 #endif
@@ -248,56 +228,39 @@ namespace FastReport.Web
             ScriptSecurity = new ScriptSecurity(new ScriptChecker());
         }
 
-
-        public HtmlString RenderSync()
+        /// <summary>
+        /// Sets WebReport localization using <see cref="Stream"/>
+        /// </summary>
+        /// <param name="stream">Stream with localization in `*.frl` format</param>
+        public void SetLocalization(Stream stream)
         {
-            return Task.Run(() => Render()).Result;
-        }
-
-        public async Task<HtmlString> Render()
-        {
-            if (Report == null)
-                throw new Exception("Report is null");
-
-            return Render(false);
+            Res.LoadLocale(stream);
         }
 
         public void LoadPrepared(string filename)
         {
             Report.LoadPrepared(filename);
-            ReportPrepared = true;
         }
 
         public void LoadPrepared(Stream stream)
         {
             Report.LoadPrepared(stream);
-            ReportPrepared = true;
         }
 
-        internal HtmlString Render(bool renderBody)
+
+        internal void InternalDispose()
         {
-            switch (Mode)
+            //foreach(var picture in PictureCache.Values)
+            //{
+            //    ArrayPool<byte>.Shared.Return(picture);
+            //}
+            PictureCache.Clear();
+
+            foreach(var tab in Tabs)
             {
-#if DIALOGS
-                case WebReportMode.Dialog:
-#endif
-                case WebReportMode.Preview:
-                    return new HtmlString(template_render(renderBody));
-#if DESIGNER
-                case WebReportMode.Designer:
-                    return RenderDesigner();
-#endif
-                default:
-                    throw new Exception($"Unknown mode: {Mode}");
+                tab.Report.Dispose();
             }
-        }
-
-        /// <summary>
-        /// Force report to be removed from internal cache
-        /// </summary>
-        public void RemoveFromCache()
-        {
-            WebReportCache.Instance.Remove(this);
+            Res.Dispose();
         }
 
         // TODO
@@ -311,8 +274,24 @@ namespace FastReport.Web
         /// </summary>
         public void NextPage()
         {
-            if (CurrentPageIndex < TotalPages - 1)
-                CurrentPageIndex++;
+            if (CurrentPageIndex >= TotalPages - 1)
+                return;
+
+            var curPageIndex = CurrentPageIndex + 1;
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                if (curPageIndex == Tabs[numberNextTab].MinPageIndex)
+                {
+                    CurrentTabIndex++;
+
+                    if (numberNextTab < Tabs.Count - 1)
+                    {
+                        numberNextTab++;
+                    }
+                }
+            }
+
+            CurrentPageIndex = curPageIndex;
         }
 
         /// <summary>
@@ -320,8 +299,24 @@ namespace FastReport.Web
         /// </summary>
         public void PrevPage()
         {
-            if (CurrentPageIndex > 0)
-                CurrentPageIndex--;
+            if (CurrentPageIndex <= 0)
+                return;
+
+            var curPageIndex = CurrentPageIndex - 1;
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                if (CurrentTab.MinPageIndex > curPageIndex)
+                {
+                    if (numberNextTab != 1 && CurrentTabIndex != numberNextTab)
+                    {
+                        numberNextTab--;
+                    }
+
+                    CurrentTabIndex--;
+                }
+            }
+
+            CurrentPageIndex = curPageIndex;
         }
 
         /// <summary>
@@ -329,6 +324,12 @@ namespace FastReport.Web
         /// </summary>
         public void FirstPage()
         {
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                numberNextTab = 1;
+                CurrentTabIndex = 0;
+            }
+
             CurrentPageIndex = 0;
         }
 
@@ -337,6 +338,12 @@ namespace FastReport.Web
         /// </summary>
         public void LastPage()
         {
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                numberNextTab = Tabs.Count - 1;
+                CurrentTabIndex = Tabs.Count - 1;
+            }
+
             CurrentPageIndex = TotalPages - 1;
         }
 
@@ -345,13 +352,69 @@ namespace FastReport.Web
         /// </summary>
         public void GotoPage(int value)
         {
-            if (value >= 0 && value < TotalPages)
-                CurrentPageIndex = value;
-        }
+            if (value < 0 || value >= TotalPages)
+                return;
 
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                for(int i = 0; i < Tabs.Count; i++)
+                {
+                    // can be better
+                    if (Tabs[i].MinPageIndex <= value)
+                    {
+                        CurrentTabIndex = i;
+                        if (i != Tabs.Count - 1)
+                            numberNextTab = i + 1;
+                    }
+                    else break;
+                }
+            }
+
+            CurrentPageIndex = value;
+        }
+#if !OPENSOURCE
+        /// <summary>
+        /// Forced transition to the report page containing the required text.
+        /// </summary>
+        public bool ReportSearch(string searchText, bool backward, bool matchCase, bool wholeWord)
+        {
+            if (string.IsNullOrEmpty(searchText))
+                return true;
+
+            int indexPage = CurrentPageIndex;
+            if (backward)
+                indexPage--;
+            else
+                indexPage++;
+
+            for (; indexPage < TotalPages && indexPage >= 0;)
+            {
+                ReportPage page = CurrentTab.Report.PreparedPages.GetPage(indexPage);
+                ObjectCollection pageObjects = page.AllObjects;
+                for (int objNo = 0; objNo < pageObjects.Count; objNo++)
+                {
+                    ISearchable obj = pageObjects[objNo] as ISearchable;
+                    if (obj != null)
+                    {
+                        CharacterRange[] ranges = obj.SearchText(searchText, matchCase, wholeWord);
+                        if (ranges != null)
+                        {
+                            GotoPage(indexPage);
+                            return true;
+                        }
+                    }
+                }
+                if (backward)
+                    indexPage--;
+                else
+                    indexPage++;
+            }
+            return false;
+        }
+#endif
 #endregion
 
-#region Script Security
+        #region Script Security
 
         private static ScriptSecurity ScriptSecurity = null;
 

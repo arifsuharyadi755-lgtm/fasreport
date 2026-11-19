@@ -18,6 +18,7 @@ namespace FastReport
     /// Specifies a set of actions that cannot be performed on the object in the design mode.
     /// </summary>
     [Flags]
+    [TypeConverter(typeof(FastReport.TypeConverters.FlagConverter))]
     public enum Restrictions
     {
         /// <summary>
@@ -60,6 +61,7 @@ namespace FastReport
     /// Specifies a set of actions that can be performed on the object in the design mode.
     /// </summary>
     [Flags]
+    [TypeConverter(typeof(FastReport.TypeConverters.FlagConverter))]
     public enum Flags
     {
         /// <summary>
@@ -144,11 +146,22 @@ namespace FastReport
         InterceptsPreviewMouseEvents = 16384
     }
 
+    [Flags]
+    internal enum ObjectState : byte
+    {
+        None = 0,
+        IsAncestor = 1,
+        IsDesigning = 2,
+        IsPrinting = 4,
+        IsRunning = 8,
+        IsDeserializing = 16,
+    }
+
     /// <summary>
-    /// Represents the root class of the FastReport object's hierarhy.
+    /// Represents the root class of the FastReport object's hierarchy.
     /// </summary>
     [ToolboxItem(false)]
-    public abstract partial class Base : Component, IFRSerializable
+    public abstract partial class Base : IDisposable, IFRSerializable
     {
         #region Fields
         private string name;
@@ -156,10 +169,7 @@ namespace FastReport
         private Flags flags;
         private Base parent;
         private string baseName;
-        private bool isAncestor;
-        private bool isDesigning;
-        private bool isPrinting;
-        private bool isRunning;
+        private ObjectState objectState;
         private Base originalComponent;
         private string alias;
         private Report report;
@@ -412,7 +422,7 @@ namespace FastReport
         [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IsAncestor
         {
-            get { return isAncestor; }
+            get { return GetObjectState(ObjectState.IsAncestor); }
         }
 
         /// <summary>
@@ -421,7 +431,7 @@ namespace FastReport
         [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IsDesigning
         {
-            get { return isDesigning; }
+            get { return GetObjectState(ObjectState.IsDesigning); }
         }
 
         /// <summary>
@@ -430,7 +440,7 @@ namespace FastReport
         [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IsPrinting
         {
-            get { return isPrinting; }
+            get { return GetObjectState(ObjectState.IsPrinting); }
         }
 
         /// <summary>
@@ -439,8 +449,19 @@ namespace FastReport
         [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IsRunning
         {
-            get { return isRunning; }
+            get { return GetObjectState(ObjectState.IsRunning); }
         }
+
+        /// <summary>
+        /// Gets a value indicating whether the object is currently processed by the report engine.
+        /// </summary>
+        [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        internal bool IsDeserializing
+        {
+            get { return GetObjectState(ObjectState.IsDeserializing); }
+            set { SetObjectState(ObjectState.IsDeserializing, value); }
+        }
+
 
         /// <summary>
         /// Gets an original component for this object.
@@ -461,6 +482,11 @@ namespace FastReport
             get { return alias; }
             set { alias = value; }
         }
+
+        /// <summary>
+        /// Adds an event handler to listen to the Disposed event on the component.
+        /// </summary>
+        public event EventHandler Disposed;
         #endregion
 
         #region Private Methods
@@ -586,21 +612,26 @@ namespace FastReport
             return text;
         }
 
-
-
         /// <inheritdoc/>
-        protected override void Dispose(bool disposing)
+        protected virtual void Dispose(bool disposing)
         {
             if (disposing)
             {
-                Parent = null;
                 Clear();
+                Parent = null;
+                Disposed?.Invoke(this, EventArgs.Empty);
             }
-            base.Dispose(disposing);
         }
         #endregion
 
         #region Public Methods
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
         /// <summary>
         /// Set object's flags.
         /// </summary>
@@ -614,24 +645,37 @@ namespace FastReport
                 this.flags &= ~flags;
         }
 
+        private bool GetObjectState(ObjectState state)
+        {
+            return (objectState & state) > 0;
+        }
+
+        private void SetObjectState(ObjectState state, bool value)
+        {
+            if (value)
+                this.objectState |= state;
+            else
+                this.objectState &= ~state;
+        }
+
         internal void SetAncestor(bool value)
         {
-            isAncestor = value;
+            SetObjectState(ObjectState.IsAncestor, value);
         }
 
         internal void SetDesigning(bool value)
         {
-            isDesigning = value;
+            SetObjectState(ObjectState.IsDesigning, value);
         }
 
         internal void SetPrinting(bool value)
         {
-            isPrinting = value;
+            SetObjectState(ObjectState.IsPrinting, value);
         }
 
         internal void SetRunning(bool value)
         {
-            isRunning = value;
+            SetObjectState(ObjectState.IsRunning, value);
         }
 
         /// <summary>
@@ -798,8 +842,8 @@ namespace FastReport
             Base c = writer.DiffObject as Base;
             if (writer.SerializeTo != SerializeTo.Preview)
             {
-                // in the preview mode we don't need to write ItemName and Name properties. Alias is wriiten instead.
-                writer.ItemName = isAncestor &&
+                // in the preview mode we don't need to write ItemName and Name properties. Alias is written instead.
+                writer.ItemName = IsAncestor &&
                   (writer.SerializeTo == SerializeTo.Report || writer.SerializeTo == SerializeTo.Undo) ?
                   "inherited" : ClassName;
                 if (Name != "")
@@ -849,14 +893,20 @@ namespace FastReport
         /// <param name="reader">Reader object.</param>
         public virtual void Deserialize(FRReader reader)
         {
-            reader.ReadProperties(this);
-            while (reader.NextItem())
+            try
             {
-                DeserializeSubItems(reader);
+                IsDeserializing = true;
+                reader.ReadProperties(this);
+                while (reader.NextItem())
+                {
+                    DeserializeSubItems(reader);
+                }
+            }
+            finally
+            {
+                IsDeserializing = false;
             }
         }
-
-        //static int i = 0;
 
         /// <summary>
         /// Assigns values from another source.
@@ -870,7 +920,7 @@ namespace FastReport
         {
             bool saveAncestor = source.IsAncestor;
             source.SetAncestor(false);
-            
+
             try
             {
                 using (XmlItem xml = new XmlItem())
@@ -943,7 +993,7 @@ namespace FastReport
             Clear();
             Assign(source);
             if (assignName)
-                Name = source.Name;
+                SetName(source.Name);
 
             foreach (Base child in source.ChildObjects)
             {
@@ -955,11 +1005,33 @@ namespace FastReport
             }
         }
 
+        internal void AssignAll(Base source, bool assignName, bool assignAncestor)
+        {
+            Clear();
+            Assign(source);
+            if (assignName)
+                SetName(source.Name);
+
+            if (assignAncestor)
+                SetAncestor(source.IsAncestor);
+
+            foreach (Base child in source.ChildObjects)
+            {
+                Base myChild = Activator.CreateInstance(child.GetType()) as Base;
+                myChild.SetReport(Report);
+                myChild.AssignAll(child, assignName, assignAncestor);
+                myChild.SetReport(null);
+                myChild.Parent = this;
+                if (assignAncestor)
+                    myChild.SetAncestor(child.IsAncestor);
+            }
+        }
+
         /// <summary>
-        /// Gets a value indicating whether the object has the specified parent in its parent hierarhy.
+        /// Gets a value indicating whether the object has the specified parent in its parent hierarchy.
         /// </summary>
         /// <param name="obj">Parent object to check.</param>
-        /// <returns>Returns <b>true</b> if the object has given parent in its parent hierarhy.</returns>
+        /// <returns>Returns <b>true</b> if the object has given parent in its parent hierarchy.</returns>
         public bool HasParent(Base obj)
         {
             Base parent = Parent;
@@ -1017,7 +1089,7 @@ namespace FastReport
                 return;
             Report report = Report;
             if (report != null)
-                report.InvokeEvent(name, new object[] { this, param });
+                report.InvokeMethod(name, new object[] { this, param });
         }
 
         /// <summary>
@@ -1123,11 +1195,11 @@ namespace FastReport
         public ObjectCollection ForEachAllConvectedObjects(object sender)
         {
             ObjectCollection list = new ObjectCollection();
-            EnumAllConvectedObjects(sender, this, list, 0);
+            EnumAllConvertedObjects(sender, this, list, 0);
             return list;
         }
 
-        private void EnumAllConvectedObjects(object sender, Base c, ObjectCollection list, int convertValue)
+        private void EnumAllConvertedObjects(object sender, Base c, ObjectCollection list, int convertValue)
         {
 
             if (c != this)
@@ -1137,7 +1209,7 @@ namespace FastReport
                     if (convertValue < 10)
                     {
                         foreach (Base b in c.GetConvertedObjects())
-                            EnumAllConvectedObjects(sender, b, list, convertValue + 1);
+                            EnumAllConvertedObjects(sender, b, list, convertValue + 1);
                         return;
 
                     }
@@ -1145,7 +1217,7 @@ namespace FastReport
                 list.Add(c);
             }
             foreach (Base obj in c.ChildObjects)
-                EnumAllConvectedObjects(sender, obj, list, convertValue);
+                EnumAllConvertedObjects(sender, obj, list, convertValue);
         }
 
         #endregion
@@ -1161,6 +1233,14 @@ namespace FastReport
             restrictions = new Restrictions();
             SetFlags(Flags.CanMove | Flags.CanResize | Flags.CanDelete | Flags.CanEdit | Flags.CanChangeOrder |
              Flags.CanChangeParent | Flags.CanCopy | Flags.CanDraw | Flags.CanShowChildrenInReportTree, true);
+        }
+
+        /// <summary>
+        /// Public destructor.
+        /// </summary>
+        ~Base()
+        {
+            Dispose(false);
         }
     }
 }

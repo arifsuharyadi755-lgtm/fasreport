@@ -39,6 +39,7 @@ namespace FastReport.Table
         private TableStyleCollection styles;
         private int fixedRows;
         private int fixedColumns;
+        private bool printOnParent;
         private float wrappedGap;
         private bool repeatHeaders;
         private bool repeatRowHeaders;
@@ -114,6 +115,21 @@ namespace FastReport.Table
                 return value;
             }
             set { fixedColumns = value; }
+        }
+
+
+        /// <summary>
+        /// Gets or sets the value that determines whether to print the dynamic table (or matrix) on its parent band directly.
+        /// </summary>
+        /// <remarks>
+        /// By default the dynamic table (matrix) is printed on its own band and is splitted on pages if necessary.
+        /// </remarks>
+        [DefaultValue(false)]
+        [Category("Layout")]
+        public bool PrintOnParent
+        {
+            get { return printOnParent; }
+            set { printOnParent = value; }
         }
 
         /// <summary>
@@ -323,11 +339,14 @@ namespace FastReport.Table
                     TableCell cell = this[x, y];
                     float width = Columns[x].Width;
 
+                    cell.Left = left;
+                    cell.Top = top;
                     if (!IsInsideSpan(cell) && (!IsPrinting || cell.Printable))
                     {
-                        cell.Left = left;
-                        cell.Top = top;
                         cell.SetPrinting(IsPrinting);
+#if !MONO || (WPF || AVALONIA)
+                        if (cell.IsVisible(e))
+#endif
                         proc(e, cell);
                     }
 
@@ -435,8 +454,6 @@ namespace FastReport.Table
 
         }
 
-
-
         #endregion
 
         #region Public Methods
@@ -448,6 +465,7 @@ namespace FastReport.Table
             TableBase src = source as TableBase;
             FixedRows = src.FixedRows;
             FixedColumns = src.FixedColumns;
+            PrintOnParent = src.PrintOnParent;
             RepeatHeaders = src.RepeatHeaders;
             RepeatRowHeaders = src.RepeatRowHeaders;
             RepeatColumnHeaders = src.RepeatColumnHeaders;
@@ -473,15 +491,12 @@ namespace FastReport.Table
             if (Config.RightToLeft)
             {
                 DrawTableRtl(e);
-                // !! ����������� ������ !!
-                //Border.Draw(e, new RectangleF(FLeftRtl - Width + AbsLeft, AbsTop, Width, Height));
-                Border.Draw(e, new RectangleF(AbsLeft, AbsTop, Width, Height));
             }
             else
             {
                 DrawTable(e);
-                Border.Draw(e, new RectangleF(AbsLeft, AbsTop, Width, Height));
             }
+            Border.Draw(e, new RectangleF(AbsLeft, AbsTop, Width, Height));
             DrawDesign(e);
         }
 
@@ -577,6 +592,7 @@ namespace FastReport.Table
 
             ResetSpanList();
         }
+
         public bool IsInsideSpan(TableCell cell)
         {
             Point address = cell.Address;
@@ -641,6 +657,8 @@ namespace FastReport.Table
                 writer.WriteInt("FixedRows", FixedRows);
             if (FixedColumns != c.FixedColumns)
                 writer.WriteInt("FixedColumns", FixedColumns);
+            if (PrintOnParent != c.PrintOnParent)
+                writer.WriteBool("PrintOnParent", PrintOnParent);
             if (RepeatHeaders != c.RepeatHeaders)
                 writer.WriteBool("RepeatHeaders", RepeatHeaders);
             if (RepeatRowHeaders != c.RepeatRowHeaders)
@@ -685,6 +703,41 @@ namespace FastReport.Table
                 }
             }
         }
+
+        internal void EmulateFill()
+        {
+            if (Fill.IsTransparent)
+                return;
+
+            Image image = new Bitmap((int)Width, (int)Height);
+            using (Graphics g = Graphics.FromImage(image))
+            {
+                g.Clear(Color.Transparent);
+                g.TranslateTransform(-AbsLeft, -AbsTop);
+                BorderLines oldLines = Border.Lines;
+                Border.Lines = BorderLines.None;
+                Draw(new FRPaintEventArgs(g, 1, 1, Report.GraphicCache));
+                Border.Lines = oldLines;
+
+                for (int y = 0; y < RowCount; y++)
+                {
+                    for (int x = 0; x < ColumnCount; x++)
+                    {
+                        TableCell cell = this[x, y];
+                        if (cell.Fill is SolidFill && cell.FillColor == Color.Transparent)
+                        {
+                            Image cellImage = ImageHelper.CutImage((Bitmap)image, cell.Bounds);
+                            cell.Fill = new TextureFill(ImageHelper.ToByteArray(cellImage, cellImage.GetImageFormat()))
+                            {
+                                WrapMode = System.Drawing.Drawing2D.WrapMode.Clamp,
+                                PreserveAspectRatio = false,
+                            };
+                        }
+                    }
+                }
+            }
+            image.Dispose();
+        }
         #endregion
 
         #region IParent Members
@@ -699,11 +752,17 @@ namespace FastReport.Table
         {
             foreach (TableColumn column in Columns)
             {
+                // Apply visible expression if needed.
+                if (serializingToPreview && !String.IsNullOrEmpty(column.VisibleExpression))
+                    column.Visible = CalcVisibleExpression(column.VisibleExpression);
                 if (!serializingToPreview || column.Visible)
                     list.Add(column);
             }
             foreach (TableRow row in Rows)
             {
+                // Apply visible expression if needed.
+                if (serializingToPreview && !String.IsNullOrEmpty(row.VisibleExpression))
+                    row.Visible = CalcVisibleExpression(row.VisibleExpression);
                 if (!serializingToPreview || row.Visible)
                     list.Add(row);
             }
@@ -1010,7 +1069,7 @@ namespace FastReport.Table
                 TableCell cellTo = breakTo[i, rowIndex];
                 cell.Height = rowHeight;
                 cell.Break(cellTo);
-                
+
                 // fix height if row is not autosized
                 if (!rowTo.AutoSize)
                 {

@@ -60,7 +60,7 @@ namespace FastReport.Utils
         private string name;
         private string value;
         private XmlProperty[] properties;
-        
+
         /// <summary>
         /// Gets a number of children in this node.
         /// </summary>
@@ -112,7 +112,7 @@ namespace FastReport.Utils
             get
             {
                 if (properties == null)
-                    properties = new XmlProperty[0];
+                    properties = Array.Empty<XmlProperty>();
                 return properties;
             }
             set
@@ -242,7 +242,7 @@ namespace FastReport.Utils
         /// </remarks>
         public XmlItem FindItem(string name)
         {
-            XmlItem result = null;
+            XmlItem result;
             int i = Find(name);
             if (i == -1)
             {
@@ -275,11 +275,6 @@ namespace FastReport.Utils
         /// </remarks>
         public string GetProp(string key)
         {
-            return GetProp(key, true);
-        }
-
-        internal string GetProp(string key, bool convertFromXml)
-        {
             if (properties == null || properties.Length == 0)
                 return "";
 
@@ -298,7 +293,7 @@ namespace FastReport.Utils
             if (properties == null || properties.Length == 0)
                 return;
 
-            sb.Append(" ");
+            sb.Append(' ');
             foreach (XmlProperty kv in properties)
             {
                 //if (string.IsNullOrWhiteSpace(kv.Key))
@@ -390,7 +385,7 @@ namespace FastReport.Utils
                 properties = null;
                 return true;
             }
-            
+
             if (properties[properties.Length - 1].Key == key)
             {
                 Array.Resize<XmlProperty>(ref properties, properties.Length - 1);
@@ -453,7 +448,8 @@ namespace FastReport.Utils
     {
         private bool autoIndent;
         private bool writeHeader;
-        private XmlItem root;
+        private readonly XmlItem root;
+        private bool readHeader = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether is necessary to indent the document
@@ -473,6 +469,16 @@ namespace FastReport.Utils
             get { return writeHeader; }
             set { writeHeader = value; }
         }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether is necessary to read xml header.
+        /// </summary>
+        public bool ReadHeader
+        {
+            get { return readHeader; }
+            set { readHeader = value; }
+        }
+
 
         /// <summary>
         /// Gets the root node of the document.
@@ -524,6 +530,16 @@ namespace FastReport.Utils
             root.Clear();
             rd.Read(root);
         }
+
+
+        public void Load(TextReader reader)
+        {
+            XmlReader rd = new XmlReader(reader);
+            rd.IsReadHeader = ReadHeader;
+            root.Clear();
+            rd.Read(root);
+        }
+
 
         /// <summary>
         /// Saves the document to a file.
@@ -578,13 +594,27 @@ namespace FastReport.Utils
 
     internal class XmlReader
     {
-        private StreamReader reader;
-        private Stream stream;
+        private readonly TextReader reader;
         private string lastName;
         private enum ReadState { FindLeft, FindRight, FindComment, FindCloseItem, Done }
         private enum ItemState { Begin, End, Complete }
         private int symbolInBuffer;
         Dictionary<string, string> stringPool;
+        private bool isReadHeader = true;
+
+        public bool IsReadHeader
+        {
+            get
+            {
+                return isReadHeader;
+            }
+            set
+            {
+                isReadHeader = value;
+            }
+        }
+
+
         private ItemState ReadItem(XmlItem item)
         {
             FastString builder;
@@ -836,18 +866,21 @@ namespace FastReport.Utils
             return false;
         }
 
-        private void RaiseException()
+        private static void RaiseException()
         {
             throw new FileFormatException();
         }
 
         private void ReadHeader()
         {
-            using (XmlItem item = new XmlItem())
+            if (isReadHeader)
             {
-                ReadItem(item);
-                if (item.Name.IndexOf("?xml") != 0)
-                    RaiseException();
+                using (XmlItem item = new XmlItem())
+                {
+                    ReadItem(item);
+                    if (!item.Name.StartsWith("?xml"))
+                        RaiseException();
+                }
             }
         }
 
@@ -858,9 +891,15 @@ namespace FastReport.Utils
         }
 
         public XmlReader(Stream stream)
+            : this(new StreamReader(stream, Encoding.UTF8))
         {
-            this.stream = stream;
-            reader = new StreamReader(this.stream, Encoding.UTF8);
+
+        }
+
+
+        public XmlReader(TextReader reader)
+        {
+            this.reader = reader;
             if (Config.IsStringOptimization)
                 stringPool = new Dictionary<string, string>();
             lastName = "";
@@ -874,7 +913,7 @@ namespace FastReport.Utils
         private bool autoIndent;
         private bool isWriteHeader;
         //private Stream FStream;
-        private TextWriter writer;
+        private readonly TextWriter writer;
 
         public bool AutoIndent
         {
@@ -893,10 +932,22 @@ namespace FastReport.Utils
             if (!autoIndent)
                 writer.Write(s);
             else
-                writer.Write(s + "\r\n");
+                writer.WriteLine(s);
         }
 
-        private string Dup(int num)
+        private void WriteLn(StringBuilder sb)
+        {
+#if NETCOREAPP
+            if (!autoIndent)
+                writer.Write(sb);
+            else
+                writer.WriteLine(sb);
+#else
+            WriteLn(sb.ToString());
+#endif
+        }
+
+        private static string Dup(int num)
         {
             string s = "";
             return s.PadLeft(num);
@@ -906,11 +957,10 @@ namespace FastReport.Utils
         {
             FastString sb = new FastString();
 
-
             // start
             if (autoIndent)
                 sb.Append(Dup(level));
-            sb.Append("<");
+            sb.Append('<');
             sb.Append(item.Name);
 
             // text
@@ -921,17 +971,17 @@ namespace FastReport.Utils
             if (item.Count == 0 && item.Value == "")
                 sb.Append("/>");
             else
-                sb.Append(">");
+                sb.Append('>');
 
             // value
             if (item.Count == 0 && item.Value != "")
             {
-                sb.Append(Converter.ToXml(item.Value,false));
+                sb.Append(Converter.ToXml(item.Value, false));
                 sb.Append("</");
                 sb.Append(item.Name);
-                sb.Append(">");
+                sb.Append('>');
             }
-            WriteLn(sb.ToString());
+            WriteLn(sb.StringBuilder);
         }
 
         private void DoWrite(XmlItem rootItem, int level)

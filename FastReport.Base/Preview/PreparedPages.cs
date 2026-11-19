@@ -136,6 +136,14 @@ namespace FastReport.Preview
         }
 
         /// <summary>
+        /// Gets the XML for rendering the outline of the report
+        /// </summary>
+        public XmlItem OutlineXml
+        {
+            get => outline.Xml;
+        }
+
+        /// <summary>
         /// Specifies an action that will be performed on <see cref="AddPage"/> method call.
         /// </summary>
         public AddPageAction AddPageAction
@@ -158,14 +166,16 @@ namespace FastReport.Preview
             get { return canUpload; }
             set
             {
-              if (canUpload != value)
-              {
-                canUpload = value;
-                if (value)
-                  UploadPages();
-              }
+                if (canUpload != value)
+                {
+                    canUpload = value;
+                    if (value)
+                        UploadPages();
+                }
             }
         }
+
+        internal event EventHandler PageAdded;
         #endregion
 
         #region Private Methods
@@ -226,19 +236,23 @@ namespace FastReport.Preview
         /// </remarks>
         public void AddPage(ReportPage page)
         {
-            CurPage++;
-            if (CurPage >= Count || AddPageAction != AddPageAction.WriteOver)
+            if (page.Visible)
             {
-                PreparedPage preparedPage = new PreparedPage(page, this);
-                preparedPages.Add(preparedPage);
+                CurPage++;
+                if (CurPage >= Count || AddPageAction != AddPageAction.WriteOver)
+                {
+                    PreparedPage preparedPage = new PreparedPage(page, this);
+                    preparedPages.Add(preparedPage);
 
-                // upload previous page to the file cache if enabled
-                if (CanUploadToCache && Count > 1)
-                    preparedPages[Count - 2].Upload();
+                    // upload previous page to the file cache if enabled
+                    if (CanUploadToCache && Count > 1)
+                        preparedPages[Count - 2].Upload();
 
-                AddPageAction = AddPageAction.WriteOver;
-                CurPage = Count - 1;
-                Report.Engine.IncLogicalPageNumber();
+                    AddPageAction = AddPageAction.WriteOver;
+                    CurPage = Count - 1;
+                    Report.Engine.IncLogicalPageNumber();
+                    PageAdded?.Invoke(this, EventArgs.Empty);
+                }
             }
         }
 
@@ -457,10 +471,10 @@ namespace FastReport.Preview
                 // save ReportInfo
                 doc.Root.SetProp("ReportInfo.Name", Report.ReportInfo.Name);
                 doc.Root.SetProp("ReportInfo.Author", Report.ReportInfo.Author);
-                doc.Root.SetProp("ReportInfo.Description", Report.ReportInfo.Description);                
+                doc.Root.SetProp("ReportInfo.Description", Report.ReportInfo.Description);
                 doc.Root.SetProp("ReportInfo.Created", SystemFake.DateTime.Now.ToString());
                 doc.Root.SetProp("ReportInfo.Modified", SystemFake.DateTime.Now.ToString());
-                doc.Root.SetProp("ReportInfo.CreatorVersion", Report.ReportInfo.CreatorVersion);                
+                doc.Root.SetProp("ReportInfo.CreatorVersion", Report.ReportInfo.CreatorVersion);
 
                 XmlItem pages = doc.Root.Add();
                 pages.Name = "pages";
@@ -559,6 +573,7 @@ namespace FastReport.Preview
                     XmlItem outline = doc.Root.FindItem("outline");
                     Outline.Xml = outline;
 
+
                     XmlItem blobStore = doc.Root.FindItem("blobstore");
                     BlobStore.LoadDestructive(blobStore);
 
@@ -624,6 +639,11 @@ namespace FastReport.Preview
         internal void ClearPageCache()
         {
             pageCache.Clear();
+        }
+
+        internal void RemovePageCache(int index)
+        {
+            pageCache.Remove(index);
         }
         #endregion
 

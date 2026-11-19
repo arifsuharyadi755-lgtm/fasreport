@@ -76,13 +76,17 @@ namespace FastReport
         /// <summary>
         /// Render with img tags, span etc. Experimental and unstable logic
         /// </summary>
-        HtmlParagraph
+        HtmlParagraph,
+        /// <summary>
+        /// Renders a text in a simplest way. For internal use only.
+        /// </summary>
+        Inline
     }
 
     /// <summary>
     /// The format of paragraph
     /// </summary>
-    [TypeConverterAttribute(typeof(TypeConverters.FRExpandableObjectConverter))]
+    [TypeConverter(typeof(TypeConverters.FRExpandableObjectConverter))]
     public class ParagraphFormat
     {
         private float firstLineIndent;
@@ -91,7 +95,7 @@ namespace FastReport
         private bool skipFirstLineIndent;
 
         /// <summary>
-        /// The first line on each paragraph, not effect if value less then  0
+        /// The first line on each paragraph.
         /// </summary>
         [Browsable(true)]
         [DefaultValue(0f)]
@@ -99,7 +103,7 @@ namespace FastReport
         public float FirstLineIndent
         {
             get { return firstLineIndent; }
-            set { if (value >= 0) firstLineIndent = value; }
+            set { firstLineIndent = value; }
         }
 
         /// <summary>
@@ -242,6 +246,29 @@ namespace FastReport
     }
 
     /// <summary>
+    ///  Specifies the behavior of the <b>MergeMode</b> feature of <b>TextObject</b>.
+    /// </summary>
+    [TypeConverter(typeof(FastReport.TypeConverters.FlagConverter))]
+    [Flags]
+    public enum MergeMode
+    {
+        /// <summary>
+        /// Merge is disabled.
+        /// </summary>
+        None = 0,
+
+        /// <summary>
+        /// Allows horizontal merging.
+        /// </summary>
+        Horizontal = 1,
+
+        /// <summary>
+        /// Allows vertical merging.
+        /// </summary>
+        Vertical = 2,
+    }
+
+    /// <summary>
     /// Represents the Text object that may display one or several text lines.
     /// </summary>
     /// <remarks>
@@ -257,6 +284,7 @@ namespace FastReport
     public partial class TextObject : TextObjectBase
     {
         #region Fields
+        private MergeMode mergeMode;
         private bool autoWidth;
         private HorzAlign horzAlign;
         private VertAlign vertAlign;
@@ -290,7 +318,6 @@ namespace FastReport
         #endregion
 
         #region Properties
-
 
         /// <summary>
         /// Gets or sets a paragraph format for a new html rendering type, not for others rendering
@@ -428,18 +455,18 @@ namespace FastReport
         }
 
         /// <summary>
-        /// Gets or sets a collection of TAB symbol positions, in pixels.
+        /// Gets or sets a collection of TAB symbol positions, in pixels. Negative values will not affect this property.
         /// </summary>
         /// <remarks>Use collection methods to add or remove TAB positions.</remarks>
         public FloatCollection TabPositions
         {
             get { return tabPositions; }
-            set 
+            set
             {
                 if (value == null)
                     tabPositions.Clear();
                 else
-                    tabPositions = value; 
+                    tabPositions = value;
             }
         }
 
@@ -523,7 +550,13 @@ namespace FastReport
         public float FontWidthRatio
         {
             get { return fontWidthRatio; }
-            set { fontWidthRatio = value; }
+            set
+            {
+                if (value > 0)
+                    fontWidthRatio = value;
+                else
+                    fontWidthRatio = 1;
+            }
         }
 
         /// <summary>
@@ -538,7 +571,7 @@ namespace FastReport
         }
 
         /// <summary>
-        /// Gets or sets the offset of the first TAB symbol.
+        /// Gets or sets the offset of the first TAB symbol. Negative value will not affect this property.
         /// </summary>
         [DefaultValue(0f)]
         [Category("Appearance")]
@@ -546,18 +579,18 @@ namespace FastReport
         public float FirstTabOffset
         {
             get { return firstTabOffset; }
-            set { firstTabOffset = value; }
+            set { if (value >= 0) firstTabOffset = value; }
         }
 
         /// <summary>
-        /// Gets or sets the width of TAB symbol, in pixels.
+        /// Gets or sets the width of TAB symbol, in pixels. Negative values will not affect this property.
         /// </summary>
         [DefaultValue(58f)]
         [Category("Appearance")]
         public float TabWidth
         {
             get { return tabWidth; }
-            set { tabWidth = value; }
+            set { if (value >= 0) tabWidth = value; }
         }
 
         /// <summary>
@@ -678,8 +711,6 @@ namespace FastReport
             set { textRenderType = value; }
         }
 
-
-
         /// <summary>
         /// Gets or sets the paragraph offset, in pixels. For HtmlParagraph use ParagraphFormat.FirstLineIndent.
         /// </summary>
@@ -709,6 +740,18 @@ namespace FastReport
                     inlineImageCache = new InlineImageCache();
                 return inlineImageCache;
             }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the text should be merged with other nearby text objects.
+        /// </summary>
+        [DefaultValue(MergeMode.None)]
+        [Category("Behavior")]
+        [Editor("FastReport.TypeEditors.FlagsEditor, FastReport", typeof(UITypeEditor))]
+        public MergeMode MergeMode
+        {
+            get { return mergeMode; }
+            set { mergeMode = value; }
         }
         #endregion
 
@@ -763,40 +806,40 @@ namespace FastReport
                         width = htmlRenderer.CalcWidth();
 
                         width += Padding.Horizontal + 1;
-                        if (LineHeight == 0)
-                            height += Padding.Vertical + 1;
+                        height += Padding.Vertical + 1;
+
                         return new SizeF(width, height);
                     }
                 }
-#if !(NETSTANDARD2_0 || NETSTANDARD2_1)
+#if CROSSPLATFORM && !SKIA
+                // in FR.Core we use AdvancedTextRenderer only if needed (IsAdvancedRendererNeeded) or if it's not Windows
+                if (IsAdvancedRendererNeeded || !Config.IsWindows)
+#else
                 if (IsAdvancedRendererNeeded)
 #endif
                 {
                     if (width == 0)
                         width = 100000;
-                    AdvancedTextRenderer renderer = new AdvancedTextRenderer(GetDisplayText(), g, font, Brushes.Black, Pens.Black,
-                      new RectangleF(0, 0, width, 100000), GetStringFormat(report.GraphicCache, 0),
-                      HorzAlign, VertAlign, LineHeight, Angle, FontWidthRatio, false, Wysiwyg, HasHtmlTags, false, 96f / DrawUtils.ScreenDpi,
-                      96f / DrawUtils.ScreenDpi, InlineImageCache);
+                    AdvancedTextRenderer renderer = new AdvancedTextRenderer(Text, g, font, Brushes.Black, Pens.Black,
+                        new RectangleF(0, 0, width, 100000), GetStringFormat(report.GraphicCache, 0),
+                        HorzAlign, VertAlign, LineHeight, Angle, FontWidthRatio, false, Wysiwyg, HasHtmlTags, false, 96f / DrawUtils.ScreenDpi,
+                        96f / DrawUtils.ScreenDpi, InlineImageCache);
                     float height = renderer.CalcHeight();
                     width = renderer.CalcWidth();
 
                     width += Padding.Horizontal + 1;
-                    if (LineHeight == 0)
-                        height += Padding.Vertical + 1;
+                    height += Padding.Vertical + 1;
                     return new SizeF(width, height);
                 }
-#if !(NETSTANDARD2_0 || NETSTANDARD2_1)
                 else
                 {
                     if (FontWidthRatio != 1)
                         width /= FontWidthRatio;
-                    SizeF size = g.MeasureString(GetDisplayText(), font, new SizeF(width, 100000));
+                    SizeF size = g.MeasureString(Text.Replace('\v', '\n'), font, new SizeF(width, 100000));
                     size.Width += Padding.Horizontal + 1;
                     size.Height += Padding.Vertical + 1;
                     return size;
                 }
-#endif
             }
             finally
             {
@@ -842,6 +885,9 @@ namespace FastReport
 
             StringFormat format = GetStringFormat(report.GraphicCache, StringFormatFlags.LineLimit);
             RectangleF textRect = new RectangleF(0, 0, Width - Padding.Horizontal, Height - Padding.Vertical);
+
+            if (textRect.Height <= 0)
+                return result;
 
             int charactersFitted;
             IGraphics g = report.MeasureGraphics;
@@ -967,7 +1013,7 @@ namespace FastReport
 
             if (AutoShrink == AutoShrinkMode.FontSize)
             {
-                while (CalcWidth() > Width - 1 && Font.Size > AutoShrinkMinSize && Font.Size>1)
+                while (CalcWidth() > Width - 1 && Font.Size > AutoShrinkMinSize && Font.Size > 1)
                 {
                     Font = new Font(Font.FontFamily, Font.Size - 1, Font.Style);
                 }
@@ -985,7 +1031,7 @@ namespace FastReport
         {
             // fixed issue 2823
             FirstTabOffset = ParagraphOffset;
-            string[] lines = text.Split(new char[] { '\n' });
+            string[] lines = text.Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
                 if (!lines[i].StartsWith("\t"))
@@ -1082,6 +1128,7 @@ namespace FastReport
             ParagraphOffset = src.ParagraphOffset;
             inlineImageCache = src.inlineImageCache;
             paragraphFormat.Assign(src.paragraphFormat);
+            MergeMode = src.MergeMode;
         }
 
         /// <summary>
@@ -1115,17 +1162,45 @@ namespace FastReport
 
         internal HtmlTextRenderer GetHtmlTextRenderer(IGraphics g, float scale, float fontScale, RectangleF textRect, StringFormat format)
         {
-            return GetHtmlTextRenderer(GetDisplayText(), g, fontScale, scale, fontScale, textRect, format, false);
+            return GetHtmlTextRenderer(Text, g, fontScale, scale, fontScale, textRect, format, false);
         }
 
-        internal HtmlTextRenderer GetHtmlTextRenderer(string text, IGraphics g, float formatScale, float scale, float fontScale, RectangleF textRect, StringFormat format, bool isPrinting)
+        internal HtmlTextRenderer GetHtmlTextRenderer(string text, IGraphics g, float formatScale, float scale, float fontScale,
+            RectangleF textRect, StringFormat format, bool isPrinting)
         {
+#if true
+            HtmlTextRenderer.RendererContext context;
+            context.angle = angle;
+            context.widthRatio = FontWidthRatio;
+            context.text = text;
+            context.g = g;
+            context.font = font.FontFamily;
+            context.size = font.Size;
+            context.style = font.Style; // no keep
+            context.color = TextColor; // no keep
+            context.underlineColor = textOutline.Color;
+            context.rect = textRect;
+            context.underlines = Underlines;
+            context.format = format; // no keep
+            context.horzAlign = horzAlign;
+            context.vertAlign = vertAlign;
+            context.paragraphFormat = ParagraphFormat.MultipleScale(formatScale);
+            context.forceJustify = ForceJustify;
+            context.scale = scale * 96f / DrawUtils.ScreenDpi;
+            context.fontScale = fontScale * 96f / DrawUtils.ScreenDpi;
+            context.cache = InlineImageCache;
+            context.isPrinting = isPrinting;
+            context.isDifferentTabPositions = TabPositions.Count > 0;
+            context.keepLastLineSpace = false;
+            return new HtmlTextRenderer(context);
+#else
             bool isDifferentTabPositions = TabPositions.Count > 0;
             return new HtmlTextRenderer(text, g, font.FontFamily, font.Size, font.Style, TextColor,
                       textOutline.Color, textRect, Underlines,
                       format, horzAlign, vertAlign, ParagraphFormat.MultipleScale(formatScale), ForceJustify,
                       scale * 96f / DrawUtils.ScreenDpi, fontScale * 96f / DrawUtils.ScreenDpi, InlineImageCache,
                       isPrinting, isDifferentTabPositions);
+#endif
         }
 
         /// <summary>
@@ -1170,6 +1245,9 @@ namespace FastReport
                 {
                     switch (TextRenderType)
                     {
+                        case TextRenderType.Inline:
+                            g.DrawString(text, font, textBrush, textRect.X, textRect.Y, StringFormat.GenericTypographic);
+                            break;
                         case TextRenderType.HtmlParagraph:
                             try
                             {
@@ -1201,6 +1279,7 @@ namespace FastReport
                                 // use simple rendering
                                 if (Angle == 0 && FontWidthRatio == 1)
                                 {
+                                    text = text.Replace('\v', '\n');
                                     if (outlinePen == null)
                                     {
                                         if (WordWrap)
@@ -1226,11 +1305,9 @@ namespace FastReport
                                         }
                                         else //without. default
                                         {
-                                            g.FillPath(textBrush, path);
-                                            g.DrawPath(outlinePen, path);
+                                            g.FillAndDrawPath(outlinePen, textBrush, path);
                                         }
                                         g.Restore(state);
-
 
                                     }
                                 }
@@ -1295,8 +1372,10 @@ namespace FastReport
             {
                 WordWrap = false;
                 float width = CalcSize().Width;
-                if ((Anchor & AnchorStyles.Right) != 0)
+                if ((Anchor & AnchorStyles.Right) != 0 || HorzAlign == HorzAlign.Right)
                     Left = Right - width;
+                if (HorzAlign == HorzAlign.Center)
+                    Left += Width / 2 - width / 2;
                 Width = width;
             }
             TextObject c = writer.DiffObject as TextObject;
@@ -1350,6 +1429,8 @@ namespace FastReport
                 writer.WriteFloat("ParagraphOffset", ParagraphOffset);
             if (ForceJustify != c.ForceJustify)
                 writer.WriteBool("ForceJustify", ForceJustify);
+            if (MergeMode != c.MergeMode)
+                writer.WriteValue("MergeMode", MergeMode);
             if (writer.SerializeTo != SerializeTo.Preview)
             {
                 if (Style != c.Style)
@@ -1358,7 +1439,7 @@ namespace FastReport
                     writer.Write(Highlight);
             }
 
-            if (ParagraphFormat.FirstLineIndent > 0)
+            if (ParagraphFormat.FirstLineIndent != 0)
                 writer.WriteFloat("ParagraphFormat.FirstLineIndent", ParagraphFormat.FirstLineIndent);
             if (ParagraphFormat.LineSpacing > 0)
                 writer.WriteFloat("ParagraphFormat.LineSpacing", ParagraphFormat.LineSpacing);
@@ -1485,7 +1566,7 @@ namespace FastReport
 
             if (AllowExpressions && !String.IsNullOrEmpty(Brackets))
             {
-                string[] brackets = Brackets.Split(new char[] { ',' });
+                string[] brackets = Brackets.Split(',');
                 // collect expressions found in the text
                 expressions.AddRange(CodeUtils.GetExpressions(Text, brackets[0], brackets[1]));
             }
@@ -1549,7 +1630,7 @@ namespace FastReport
             {
                 if (!String.IsNullOrEmpty(Brackets))
                 {
-                    string[] brackets = Brackets.Split(new char[] { ',' });
+                    string[] brackets = Brackets.Split(',');
                     FindTextArgs args = new FindTextArgs();
                     args.Text = new FastString(Text);
                     args.OpenBracket = brackets[0];
@@ -1558,8 +1639,13 @@ namespace FastReport
                     while (args.StartIndex < args.Text.Length)
                     {
                         string expression = CodeUtils.GetExpression(args, false);
-                        if (expression == "")
+                        if (expression == null)
                             break;
+
+                        //if (!Report.IsCompileNeeded)
+                        //{
+                        //    expression = Text;
+                        //}
 
                         string formattedValue = CalcAndFormatExpression(expression, expressionIndex);
 

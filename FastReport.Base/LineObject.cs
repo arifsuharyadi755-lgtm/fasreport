@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using FastReport.Utils;
+using System.Linq;
 
 namespace FastReport
 {
@@ -22,6 +23,7 @@ namespace FastReport
         private bool diagonal;
         private CapSettings startCap;
         private CapSettings endCap;
+        private FloatCollection dashPattern;
         #endregion
 
         #region Properties
@@ -58,6 +60,20 @@ namespace FastReport
             get { return endCap; }
             set { endCap = value; }
         }
+
+        /// <summary>
+        /// Gets or sets collection of values for custom dash pattern.
+        /// </summary>
+        /// <remarks>
+        /// Each element should be a non-zero positive number. 
+        /// If the number is negative or zero, that number is replaced by one.
+        /// </remarks>
+        [Category("Appearance")]
+        public FloatCollection DashPattern
+        {
+            get { return dashPattern; }
+            set { dashPattern = value; }
+        }
         #endregion
 
         #region Public Methods
@@ -70,6 +86,7 @@ namespace FastReport
             Diagonal = src.Diagonal;
             StartCap.Assign(src.StartCap);
             EndCap.Assign(src.EndCap);
+            DashPattern.Assign(src.DashPattern);
         }
 
         /// <inheritdoc/>
@@ -93,20 +110,20 @@ namespace FastReport
 
             Pen pen = e.Cache.GetPen(Border.Color, Border.Width * e.ScaleX, Border.DashStyle);
 
-            float width = Width;
-            float height = Height;
+            DrawUtils.SetPenDashPatternOrStyle(DashPattern, pen, Border);
+
             if (!Diagonal)
             {
-                if (Math.Abs(width) > Math.Abs(height))
-                    height = 0;
+                if (Math.Abs(Width) > Math.Abs(Height))
+                    Height = 0;
                 else
-                    width = 0;
+                    Width = 0;
             }
 
             float x1 = AbsLeft * e.ScaleX;
             float y1 = AbsTop * e.ScaleY;
-            float x2 = (AbsLeft + width) * e.ScaleX;
-            float y2 = (AbsTop + height) * e.ScaleY;
+            float x2 = (AbsLeft + Width) * e.ScaleX;
+            float y2 = (AbsTop + Height) * e.ScaleY;
 
             if (StartCap.Style == CapStyle.None && EndCap.Style == CapStyle.None)
             {
@@ -168,6 +185,23 @@ namespace FastReport
         }
 
         /// <inheritdoc/>
+        public override List<ValidationError> Validate()
+        {
+            List<ValidationError> listError = new List<ValidationError>();
+
+            if (Height == 0 && Width == 0)
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,IncorrectSize"), this));
+
+            if (Name == "")
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,UnnamedObject"), this));
+
+            if (Parent is ReportComponentBase && !Validator.RectContainInOtherRect((Parent as ReportComponentBase).AbsBounds, this.AbsBounds))
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,OutOfBounds"), this));
+
+            return listError;
+        }
+
+        /// <inheritdoc/>
         public override void Serialize(FRWriter writer)
         {
             Border.SimpleBorder = true;
@@ -178,6 +212,8 @@ namespace FastReport
                 writer.WriteBool("Diagonal", Diagonal);
             StartCap.Serialize("StartCap", writer, c.StartCap);
             EndCap.Serialize("EndCap", writer, c.EndCap);
+            if (DashPattern?.Count > 0)
+                writer.WriteValue("DashPattern", DashPattern);
         }
         #endregion
 
@@ -190,6 +226,7 @@ namespace FastReport
             endCap = new CapSettings();
             FlagSimpleBorder = true;
             FlagUseFill = false;
+            dashPattern = new FloatCollection();
         }
     }
 }

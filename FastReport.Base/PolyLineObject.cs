@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace FastReport
@@ -32,10 +33,24 @@ namespace FastReport
 
         private PointF center;
         private PolyPointCollection pointsCollection;
+        private FloatCollection dashPattern;
 
         #endregion Private Fields
 
         #region Public Properties
+        /// <summary>
+        /// Gets or sets collection of values for custom dash pattern.
+        /// </summary>
+        /// <remarks>
+        /// Each element should be a non-zero positive number. 
+        /// If the number is negative or zero, that number is replaced by one.
+        /// </remarks>
+        [Category("Appearance")]
+        public FloatCollection DashPattern
+        {
+            get { return dashPattern; }
+            set { dashPattern = value; }
+        }
 
         /// <summary>
         /// Return points collection.
@@ -111,6 +126,7 @@ namespace FastReport
             FlagUseFill = false;
             pointsCollection = new PolyPointCollection();
             center = PointF.Empty;
+            dashPattern = new FloatCollection();
             InitDesign();
         }
 
@@ -127,6 +143,7 @@ namespace FastReport
 
             pointsCollection = src.pointsCollection.Clone();
             center = src.center;
+            DashPattern.Assign(src.DashPattern);
             //recalculateBounds();
         }
 
@@ -176,7 +193,7 @@ namespace FastReport
                     IGraphics g = e.Graphics;
                     float x = AbsLeft + CenterX;
                     float y = AbsTop + CenterY;
-                    if(pointsCollection.Count == 1)
+                    if (pointsCollection.Count == 1)
                     {
                         x += pointsCollection[0].X;
                         y += pointsCollection[0].Y;
@@ -322,7 +339,7 @@ namespace FastReport
 
                     bool haveToCalculate = false;
 
-                    
+
                     PolyPoint p_1 = null;
                     PolyPoint p_2 = null;
 
@@ -363,7 +380,7 @@ namespace FastReport
                         if (p_2 == null)
                             p_2 = GetPseudoPoint(point, prev);
 
-                       
+
                         // now calculate extrema
 
                         // x
@@ -415,7 +432,7 @@ namespace FastReport
                                     bottom = y;
                             }
                         }
-                        
+
 
                     }
                 }
@@ -440,7 +457,7 @@ namespace FastReport
             }
         }
 
-        private float RecalculateBounds_Delta(float p_0,float p_1, float p_2, float p_3)
+        private float RecalculateBounds_Delta(float p_0, float p_1, float p_2, float p_3)
         {
             return p_1 * p_1 - p_0 * p_2 - p_1 * p_2 + p_2 * p_2 + p_0 * p_3 - p_1 * p_3;
         }
@@ -477,6 +494,8 @@ namespace FastReport
 
             writer.WriteFloat("CenterX", center.X);
             writer.WriteFloat("CenterY", center.Y);
+            if (DashPattern?.Count > 0)
+                writer.WriteValue("DashPattern", DashPattern);
         }
 
         public void SetPolyLine(PointF[] newPoints)
@@ -564,6 +583,8 @@ namespace FastReport
             if (polygonSelectionMode == PolygonSelectionMode.MoveAndScale)
                 pen = e.Cache.GetPen(Border.Color, Border.Width * e.ScaleX, Border.DashStyle);
             else pen = e.Cache.GetPen(Border.Color, 1, DashStyle.Solid);
+
+            DrawUtils.SetPenDashPatternOrStyle(DashPattern, pen, Border);
 
             using (GraphicsPath path = GetPath(pen, AbsLeft, AbsTop, AbsRight, AbsBottom, e.ScaleX, e.ScaleY))
                 e.Graphics.DrawPath(pen, path);
@@ -882,7 +903,7 @@ namespace FastReport
                 PolyPointCollection result = new PolyPointCollection();
 
                 result.points = new List<PolyPoint>();
-                foreach(PolyPoint point in points)
+                foreach (PolyPoint point in points)
                 {
                     result.points.Add(point.Clone());
                 }

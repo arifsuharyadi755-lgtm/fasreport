@@ -10,7 +10,7 @@ namespace FastReport.Gauge
     /// <summary>
     /// Represents a gauge object.
     /// </summary>
-    public partial class GaugeObject : ReportComponentBase, ICloneable
+    public partial class GaugeObject : ReportComponentBase
     {
         #region Fields
 
@@ -67,7 +67,7 @@ namespace FastReport.Gauge
         }
 
         /// <summary>
-        /// Gets or sets the currenta value of gauge.
+        /// Gets or sets the current value of gauge.
         /// </summary>
         [Category("Layout")]
         public double Value
@@ -78,6 +78,14 @@ namespace FastReport.Gauge
                 if ((value >= minimum) && (value <= maximum))
                 {
                     this.value = value;
+                }
+                else if (value < minimum)
+                {
+                    this.value = minimum;
+                }
+                else if (value > maximum)
+                {
+                    this.value = maximum;
                 }
             }
         }
@@ -213,7 +221,11 @@ namespace FastReport.Gauge
         public override void GetData()
         {
             base.GetData();
+            GetDataShared();
+        }
 
+        private void GetDataShared()
+        {
             if (!String.IsNullOrEmpty(Expression))
             {
                 object val = Report.Calc(Expression);
@@ -302,9 +314,11 @@ namespace FastReport.Gauge
         /// Clone Gauge Object
         /// </summary>
         /// <returns> clone of this object</returns>
-        public object Clone()
+        public GaugeObject Clone()
         {
-            return this.MemberwiseClone();
+            var clone = Activator.CreateInstance(this.GetType()) as GaugeObject;
+            clone.Assign(this);
+            return clone;
         }
 
         #endregion // Public Methods

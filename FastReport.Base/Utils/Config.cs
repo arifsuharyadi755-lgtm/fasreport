@@ -5,6 +5,8 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace FastReport.Utils
 {
@@ -16,16 +18,19 @@ namespace FastReport.Utils
     {
 #if COMMUNITY
         const string CONFIG_NAME = "FastReport.Community.config";
+#elif MONO
+#if WPF
+        const string CONFIG_NAME = "FastReport.WPF.config";
+#elif AVALONIA
+        const string CONFIG_NAME = "FastReport.Avalonia.config";
 #else
-#if MONO
         const string CONFIG_NAME = "FastReport.Mono.config";
+#endif
 #else
         const string CONFIG_NAME = "FastReport.config";
 #endif
-#endif
         #region Private Fields
 
-        private static readonly CultureInfo engCultureInfo = new CultureInfo("en-US");
         private static readonly XmlDocument FDoc = new XmlDocument();
 
         private static readonly string version = typeof(Report).Assembly.GetName().Version.ToString(3);
@@ -40,20 +45,16 @@ namespace FastReport.Utils
         private static bool FStringOptimization = true;
         private static bool FWebMode;
         private static bool preparedCompressed = true;
-        private static bool disableHotkeys = false;
-        private static bool disableBacklight = false;
         private static bool enableScriptSecurity = false;
         private static ScriptSecurityProperties scriptSecurityProps = null;
         private static bool forbidLocalData = false;
         private static bool userSetsScriptSecurity = false;
-        private static FRPrivateFontCollection privateFontCollection = new FRPrivateFontCollection();
+        private static readonly FRPrivateFontCollection privateFontCollection = new FRPrivateFontCollection();
         internal static bool CleanupOnExit;
+        private static CompilerSettings compilerSettings = new CompilerSettings();
+        private static string applicationFolder;
+        private static readonly string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
-
-
-#if NETSTANDARD2_0 || NETSTANDARD2_1
-        private static readonly bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-#endif
 
         #endregion Private Fields
 
@@ -61,18 +62,16 @@ namespace FastReport.Utils
         /// <summary>
         /// Gets a value indicating that the Mono runtime is used.
         /// </summary>
-        public static bool IsRunningOnMono
+        internal static bool IsRunningOnMono
         {
             get { return FIsRunningOnMono; }
         }
 
-#if NETSTANDARD2_0 || NETSTANDARD2_1
-        public static bool IsWindows
-        {
-            get { return isWindows; }
-        }
-#endif
+#if CROSSPLATFORM
+        internal static bool IsWindows { get; } = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
+        internal static bool IsWasm { get; } = RuntimeInformation.IsOSPlatform(OSPlatform.Create("BROWSER"));// (int)RuntimeInformation.ProcessArchitecture == 4;  // Architecture.Wasm = 4;
+#endif
 
 
         /// <summary>
@@ -104,19 +103,20 @@ namespace FastReport.Utils
         }
 
         /// <summary>
-        /// Gets the application folder.
+        /// Gets or sets the application folder.
         /// </summary>
         public static string ApplicationFolder
         {
-            get { return AppDomain.CurrentDomain.BaseDirectory; }
-        }
-
-        /// <summary>
-        /// Gets an english culture information for localization purposes
-        /// </summary>
-        public static CultureInfo EngCultureInfo
-        {
-            get { return engCultureInfo; }
+            get
+            {
+                if (applicationFolder == null)
+                    return baseDirectory;
+                return applicationFolder;
+            }
+            set
+            {
+                applicationFolder = value;
+            }
         }
 
         /// <summary>
@@ -132,7 +132,7 @@ namespace FastReport.Utils
             get { return FFolder; }
             set { FFolder = value; }
         }
-        
+
         /// <summary>
         /// Gets or sets the path used to font.list file.
         /// </summary>
@@ -162,15 +162,6 @@ namespace FastReport.Utils
         {
             get { return FRightToLeft; }
             set { FRightToLeft = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether hotkeys should be disabled.
-        /// </summary>
-        public static bool DisableHotkeys
-        {
-            get { return disableHotkeys; }
-            set { disableHotkeys =  value; }
         }
 
         /// <summary>
@@ -217,6 +208,7 @@ namespace FastReport.Utils
         /// <summary>
         /// Gets a PrivateFontCollection instance.
         /// </summary>
+        [Obsolete("Use FastReport.FontManager instead")]
         public static FRPrivateFontCollection PrivateFontCollection
         {
             get { return privateFontCollection; }
@@ -240,7 +232,7 @@ namespace FastReport.Utils
                 userSetsScriptSecurity = true;
                 if (value)
                 {
-                    if(scriptSecurityProps == null)
+                    if (scriptSecurityProps == null)
                         scriptSecurityProps = new ScriptSecurityProperties();
                 }
             }
@@ -258,7 +250,34 @@ namespace FastReport.Utils
         {
             get { return scriptSecurityProps; }
         }
+
+        /// <summary>
+        /// Settings of report compiler.
+        /// </summary>
+        public static CompilerSettings CompilerSettings
+        {
+            get { return compilerSettings; }
+            set { compilerSettings = value; }
+        }
+
         #endregion Public Properties
+
+        #region Public Methods
+        /// <summary>
+        /// Warms up the Roslyn compiler asynchronously.
+        /// </summary>
+        /// <remarks>
+        /// Call this method at an application start to warm up the Roslyn compiler (used in NetCore).
+        /// </remarks>
+        public static async void CompilerWarmup()
+        {
+            Report.EnsureInit();
+            await Task.Run(() =>
+            {
+                new Report() { ScriptText = "using System; namespace FastReport { public class ReportScript {\r\n} }" }.Compile();
+            });
+        }
+        #endregion
 
         #region Internal Methods
 
@@ -277,10 +296,9 @@ namespace FastReport.Utils
         internal static void Init()
         {
             FIsRunningOnMono = Type.GetType("Mono.Runtime") != null;
-
             CheckWebMode();
 
-#if !NETSTANDARD
+#if !CROSSPLATFORM || AVALONIA
             if (!WebMode)
                 LoadConfig();
 #endif
@@ -291,18 +309,24 @@ namespace FastReport.Utils
                 scriptSecurityProps = new ScriptSecurityProperties();
             }
 
+            LoadPlugins();
 #if !COMMUNITY
             RestoreExportOptions();
 #endif
-            LoadPlugins();
+#if !SKIA
+            InitTextRenderingHint();
+#endif
+        }
 
+        private static void InitTextRenderingHint()
+        {
             // init TextRenderingHint.SystemDefault
             // bug in .Net: if you use any other hint before SystemDefault, the SystemDefault will
             // look like SingleBitPerPixel
             using (Bitmap bmp = new Bitmap(1, 1))
             using (Graphics g = Graphics.FromImage(bmp))
             {
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.SystemDefault;
+                g.TextRenderingHint = TextRenderingHint.SystemDefault;
                 g.DrawString(" ", SystemFonts.DefaultFont, Brushes.Black, 0, 0);
             }
         }
@@ -347,7 +371,12 @@ namespace FastReport.Utils
         }
 
 
-        internal static void OnScriptCompile(ScriptSecurityEventArgs e)
+        /// <summary>
+        /// Invokes ScriptCompile event.
+        /// </summary>
+        /// <param name="e">Event args.</param>
+        /// <exception cref="CompilerException"></exception>
+        public static void OnScriptCompile(ScriptSecurityEventArgs e)
         {
             if (ScriptCompile != null)
             {
@@ -372,9 +401,9 @@ namespace FastReport.Utils
         }
 #endif
 
-#endregion Internal Methods
+        #endregion Internal Methods
 
-#region Private Methods
+        #region Private Methods
 
         private static string GetTempFileName()
         {
@@ -397,13 +426,20 @@ namespace FastReport.Utils
             return systemTempFolder;
         }
 
+        static partial void SaveMaskConnectionStringPassword();
+
+        static partial void SaveConnectionStringVisible();
+
         private static void CurrentDomain_ProcessExit(object sender, EventArgs e)
         {
             FDoc.Root.Name = "Config";
             FDoc.AutoIndent = true;
             SaveUIStyle();
             SaveUIOptions();
-            SavePreviewSettings();
+            SaveCompilerSettings();
+            SaveAuthServiceUser();
+            SaveConnectionStringVisible();
+            SaveMaskConnectionStringPassword();
 #if !COMMUNITY
             SaveExportOptions();
 #endif
@@ -431,6 +467,10 @@ namespace FastReport.Utils
                 }
             }
         }
+
+        static partial void RestoreMaskConnectionStringPassword();
+
+        static partial void RestoreConnectionStringVisible();
 
         private static void LoadConfig()
         {
@@ -468,8 +508,11 @@ namespace FastReport.Utils
                 RestoreUIStyle();
                 RestoreDefaultLanguage();
                 RestoreUIOptions();
-                RestorePreviewSettings();
+                RestoreCompilerSettings();
                 Res.LoadDefaultLocale();
+                RestoreAuthServiceUser();
+                RestoreMaskConnectionStringPassword();
+                RestoreConnectionStringVisible();
                 AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
             }
             if (!configLoaded)
@@ -495,7 +538,8 @@ namespace FastReport.Utils
 
                 try
                 {
-                    ProcessAssembly(Assembly.LoadFrom(pluginName));
+                    var assembly = Assembly.LoadFrom(pluginName);
+                    ProcessAssembly(assembly);
                 }
                 catch
                 {
@@ -503,30 +547,11 @@ namespace FastReport.Utils
             }
 
             // For CoreWin
-#if NETCOREAPP
+#if (COREWIN || AVALONIA)
             LoadPluginsInCurrentFolder();
 #endif
         }
 
-        private static void LoadPluginsInCurrentFolder()
-        {
-            // find all plugin-connector in current directory
-            var plugins = Directory.GetFiles(ApplicationFolder, "FastReport.Data.*.dll");
-
-            // initialize
-            foreach(var pluginName in plugins)
-            {
-                try
-                {
-                    ProcessAssembly(Assembly.LoadFrom(pluginName));
-                }
-                catch
-                {
-                }
-            }
-
-
-        }
 
         private static void ProcessAssembly(Assembly a)
         {
@@ -539,9 +564,8 @@ namespace FastReport.Utils
 
         private static void RestoreDefaultLanguage()
         {
-            XmlItem xi = Root.FindItem("Designer").FindItem("Code");
-            string defaultLanguage = xi.GetProp("DefaultScriptLanguage");
-            ReportSettings.DefaultLanguage = defaultLanguage == Language.Vb.ToString() ? Language.Vb : Language.CSharp;
+            var storage = new StorageService("Designer,Code");
+            ReportSettings.DefaultLanguage = storage.GetEnum("DefaultScriptLanguage", Language.CSharp);
         }
 
         private static void RestoreRightToLeft()
@@ -577,17 +601,22 @@ namespace FastReport.Utils
         /// </summary>
         public class ScriptSecurityProperties
         {
-            private readonly string[] defaultStopList = new[]
+            private static readonly Regex[] defaultRegexStopList = new[]
                 {
-                    "GetType",
-                    "typeof", 
-                    "TypeOf",   // VB
-                    "DllImport",
-                    "LoadLibrary",
-                    "GetProcAddress",
+                    new Regex("[\\s\\d\\W]GetType[\\s\\W]", RegexOptions.Compiled),
+                    new Regex("[\\s\\W]typeof[\\s\\W]", RegexOptions.Compiled),
+                    new Regex("[\\s\\W]TypeOf[\\s]", RegexOptions.Compiled),   // VB
+                };
+
+            private static readonly string[] defaultStopList = new[]
+                {
+                   "DllImport",
+                   "LoadLibrary",
+                   "GetProcAddress",
                 };
 
             private string[] stopList;
+            private Regex[] regexStopList;
 
             /// <summary>
             /// Add stubs for the most dangerous classes (in System.IO, System.Reflection etc) 
@@ -597,15 +626,31 @@ namespace FastReport.Utils
             /// <summary>
             /// List of keywords that shouldn't be declared in the report script
             /// </summary>
-            public string[] StopList 
-            { 
+            public string[] StopList
+            {
                 get { return (string[])stopList.Clone(); }
                 set
                 {
-                    if(value != null)
+                    if (value != null)
                     {
                         OnStopListChanged?.Invoke(this, null);
                         stopList = value;
+                    }
+                }
+            }
+
+            /// <summary>
+            /// List of keywords in regex format that shouldn't be declared in the report script
+            /// </summary>
+            public Regex[] RegexStopList
+            {
+                get { return (Regex[])regexStopList.Clone(); }
+                set
+                {
+                    if (value != null)
+                    {
+                        OnStopListChanged?.Invoke(this, null);
+                        regexStopList = value;
                     }
                 }
             }
@@ -622,6 +667,7 @@ namespace FastReport.Utils
 
             internal ScriptSecurityProperties(string[] stopList)
             {
+                regexStopList = defaultRegexStopList;
                 this.stopList = stopList;
             }
 
@@ -630,29 +676,26 @@ namespace FastReport.Utils
             /// </summary>
             public void SetDefaultStopList()
             {
+                RegexStopList = defaultRegexStopList;
                 StopList = defaultStopList;
             }
 
         }
 
-        private static void SaveUIOptions()
+        private static void SaveCompilerSettings()
         {
-            XmlItem xi = Root.FindItem("UIOptions");
-            xi.SetProp("DisableHotkeys", Converter.ToString(DisableHotkeys));
+            var storage = new StorageService("CompilerSettings");
+            storage.SetStr("Placeholder", CompilerSettings.Placeholder);
+            storage.SetEnum("ExceptionBehaviour", CompilerSettings.ExceptionBehaviour);
         }
 
-        private static void RestoreUIOptions()
+        private static void RestoreCompilerSettings()
         {
-            RestoreRightToLeft();
-
-            XmlItem xi = Root.FindItem("UIOptions");
-            string disableHotkeysStringValue = xi.GetProp("DisableHotkeys");
-            if (!String.IsNullOrEmpty(disableHotkeysStringValue))
-            {
-                disableHotkeys = disableHotkeysStringValue.ToLower() != "false";
-            }
+            var storage = new StorageService("CompilerSettings");
+            CompilerSettings.Placeholder = storage.GetStr("Placeholder");
+            CompilerSettings.ExceptionBehaviour = storage.GetEnum("ExceptionBehaviour", CompilerExceptionBehaviour.Default);
         }
 
-#endregion Private Methods
+        #endregion Private Methods
     }
 }

@@ -101,6 +101,7 @@
     </Shapes>
     <PictureObject Text="Billede"/>
     <TableObject Text="Tabel"/>
+    <Matrix Text="Krydstabel"/>
     <MatrixObject Text="Krydstabel"/>
     <SubreportObject Text="Subreport"/>
     <BarcodeObject Text="Stregkode"/>
@@ -149,7 +150,7 @@
     <MdbFile Text="MS Access database (*.mdb)|*.mdb"/>
     <MdfFile Text="Microsoft SQL Server database (*.mdf)|*.mdf"/>
     <RtfFile Text="Rich Text-fil (*.rtf)|*.rtf"/>
-    <Images Text="Billedefiler|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Billedefiler|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Assembly (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="Printerfil (*.prn)|*.prn"/>
     <BmpFile Text="Bitmap billede (*.bmp)|*.bmp"/>
@@ -1345,7 +1346,7 @@
       <InsertToRight Text="Indsæt kolonne til højre"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Sammensæt celler"/>
+      <Merge Text="Sammensæt celler"/>
       <Split Text="Split celler"/>
     </TableCell>
     <MatrixObject>
@@ -1487,11 +1488,11 @@
     <Ods Text="Eksporter til OpenOfice Calc">
       <File Text="OpenOffice Calc"/>
     </Ods>
-    <Xlsx Text="Eksporter til Excel 2007">
-      <File Text="Excel 2007 fil"/>
+    <Xlsx Text="Eksporter til Microsoft Excel">
+      <File Text="Microsoft Excel fil"/>
     </Xlsx>
-    <Pptx Text="Eksporter til PowerPoint 2007">
-      <File Text="PowerPoint 2007 fil"/>
+    <Pptx Text="Eksporter til Microsoft PowerPoint">
+      <File Text="Microsoft PowerPoint fil"/>
     </Pptx>
     <Pdf Text="Eksporter til PDF">
       <File Text="Adobe Acrobat"/>

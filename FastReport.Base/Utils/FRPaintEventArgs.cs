@@ -10,10 +10,10 @@ namespace FastReport.Utils
     /// </summary>
     public class FRPaintEventArgs
     {
-        private IGraphics graphics;
-        private float scaleX;
-        private float scaleY;
-        private GraphicCache cache;
+        private readonly IGraphics graphics;
+        private readonly float scaleX;
+        private readonly float scaleY;
+        private readonly GraphicCache cache;
 
         /// <summary>
         /// Gets a <b>Graphics</b> object to draw on.
@@ -70,7 +70,7 @@ namespace FastReport.Utils
         /// <param name="scaleY">Y scale factor.</param>
         /// <param name="cache">Cache that contains graphics objects.</param>
         public FRPaintEventArgs(Graphics g, float scaleX, float scaleY, GraphicCache cache) :
-            this(new GdiGraphics(g, false), scaleX, scaleY, cache)
+            this(GdiGraphics.FromGraphics(g), scaleX, scaleY, cache)
         {
         }
     }

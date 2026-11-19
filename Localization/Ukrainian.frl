@@ -101,6 +101,7 @@
     </Shapes>
     <PictureObject Text="Зображення"/>
     <TableObject Text="Таблиця"/>
+    <Matrix Text="Матриця"/>
     <MatrixObject Text="Матриця"/>
     <SubreportObject Text="Вкладений звіт"/>
     <BarcodeObject Text="Штрих-код"/>
@@ -149,7 +150,7 @@
     <MdbFile Text="База даних MS Access (*.mdb)|*.mdb"/>
     <MdfFile Text="База даних Microsoft SQL Server (*.mdf)|*.mdf"/>
     <RtfFile Text="Форматований текст (*.rtf)|*.rtf"/>
-    <Images Text="Файли зображень|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Файли зображень|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Збірка (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="Файл друку (*.prn)|*.prn"/>
     <BmpFile Text="Растрове зображення (*.bmp)|*.bmp"/>
@@ -1344,7 +1345,7 @@
       <InsertToRight Text="Вставити колонку праворуч"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Об'єднати клітинки"/>
+      <Merge Text="Об'єднати клітинки"/>
       <Split Text="Розділити клітинку"/>
     </TableCell>
     <MatrixObject>
@@ -1486,11 +1487,11 @@
     <Ods Text="Експорт в OpenOffice Calc">
       <File Text="OpenOffice Calc"/>
     </Ods>
-    <Xlsx Text="Експорт в Excel 2007">
-      <File Text="Excel 2007 формат"/>
+    <Xlsx Text="Експорт в Microsoft Excel">
+      <File Text="Microsoft Excel формат"/>
     </Xlsx>
-    <Pptx Text="Експорт в PowerPoint 2007">
-      <File Text="PowerPoint 2007 формат"/>
+    <Pptx Text="Експорт в Microsoft PowerPoint">
+      <File Text="Microsoft PowerPoint формат"/>
     </Pptx>
     <Pdf Text="Експорт в PDF">
       <File Text="PDF формат"/>

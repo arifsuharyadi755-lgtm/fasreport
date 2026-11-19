@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace FastReport.Utils
 {
@@ -71,9 +73,60 @@ namespace FastReport.Utils
     /// </summary>
     public class CompilerException : Exception
     {
-        internal CompilerException(string message)
-          : base(message)
+        /// <summary>
+        /// Contains a list of errors.
+        /// </summary>
+        public Info[] Errors { get; }
+        
+        /// <summary>
+        /// Creates a new instance of CompilerException class.
+        /// </summary>
+        /// <param name="message">Error message.</param>
+        /// <param name="errors">Array of error info items.</param>
+        public CompilerException(string message, Info[] errors = null) : base(message)
         {
+            Errors = errors;
+        }
+
+        /// <summary>
+        /// The exception info.
+        /// </summary>
+        public class Info
+        {
+            /// <summary>
+            /// Line number.
+            /// </summary>
+            public int Line { get; }
+            
+            /// <summary>
+            /// Column number.
+            /// </summary>
+            public int Column { get; }
+            
+            /// <summary>
+            /// Report object in which exception occurs.
+            /// </summary>
+            public string ReportObject { get; }
+            
+            /// <summary>
+            /// Error message.
+            /// </summary>
+            public string Message { get; }
+
+            /// <summary>
+            /// Creates a new instance of Info class.
+            /// </summary>
+            /// <param name="line">Line number.</param>
+            /// <param name="column">Column number.</param>
+            /// <param name="reportObject">Name of report object in which an error occured.</param>
+            /// <param name="message">Error message.</param>
+            public Info(int line, int column, string reportObject, string message)
+            {
+                Line = line;
+                Column = column;
+                ReportObject = reportObject;
+                Message = message;
+            }
         }
     }
 
@@ -182,11 +235,22 @@ namespace FastReport.Utils
     /// <summary>
     /// The exception that is thrown when the Group Header has no group condition.
     /// </summary>
-   public class GroupHeaderHasNoGroupCondition : Exception
+    public class GroupHeaderHasNoGroupCondition : Exception
     {
         internal GroupHeaderHasNoGroupCondition(string name)
           : base(String.Format(Res.Get("Messages,GroupHeaderHasNoGroupCondition"), name))
         {
-        }       
+        }
+    }
+
+    /// <summary>
+    /// The exception that is thrown when the image cannot be loaded.
+    /// </summary>
+    public class ImageLoadException : FileLoadException
+    {
+        internal ImageLoadException(Exception ex)
+          : base(Res.Get("Messages,ImageLoadException"), ex)
+        {
+        }
     }
 }

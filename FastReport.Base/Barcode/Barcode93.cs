@@ -4,11 +4,11 @@ using FastReport.Utils;
 
 namespace FastReport.Barcode
 {
-  /// <summary>
-  /// Generates the Code93 barcode.
-  /// </summary>
-  public class Barcode93 : LinearBarcodeBase
-  {
+    /// <summary>
+    /// Generates the Code93 barcode.
+    /// </summary>
+    public class Barcode93 : LinearBarcodeBase
+    {
 #if READONLY_STRUCTS
         private readonly struct Code93
 #else
@@ -26,7 +26,7 @@ namespace FastReport.Barcode
             }
         }
 
-    private static Code93[] tabelle_93 = {
+        private static Code93[] tabelle_93 = {
       new Code93("0", "131112"),
       new Code93("1", "111213"),
       new Code93("2", "111312"),
@@ -70,95 +70,95 @@ namespace FastReport.Barcode
       new Code93("/", "112131"),
       new Code93("+", "113121"),
       new Code93("%", "211131"),
-      new Code93("[", "121221"),     // only used for Extended Code 93
-      new Code93("]", "312111"),     // only used for Extended Code 93}
-      new Code93("{", "311121"),     // only used for Extended Code 93}
-      new Code93("}", "122211")      // only used for Extended Code 93}
+      new Code93("[", "121221"),     // ($) only used for Extended Code 93
+      new Code93("]", "312111"),     // (%) only used for Extended Code 93}
+      new Code93("{", "311121"),     // (/) only used for Extended Code 93}
+      new Code93("}", "122211")      // (+) only used for Extended Code 93}
     };
 
-    /// <inheritdoc/>
-    public override bool IsNumeric
-    {
-      get { return false; }
-    }
-
-    private int FindBarItem(string c)
-    {
-      for (int i = 0; i < tabelle_93.Length; i++)
-      {
-        if (c == tabelle_93[i].c)
-          return i;
-      }    
-
-      return -1;
-    }
-
-    internal override string GetPattern()
-    {
-      string result = "111141";   // Startcode
-
-      foreach (char c in text)
-      {
-        int idx = FindBarItem(c.ToString());
-        if (idx < 0)
-          throw new Exception(Res.Get("Messages,InvalidBarcode2"));
-        result += tabelle_93[idx].data;
-      }
-
-      // Checksums
-      if (CalcCheckSum)
-      {
-        int checkC = 0;
-        int checkK = 0;
-
-        int weightC = 1;
-        int weightK = 2;
-
-        for (int i = text.Length - 1; i >= 0; i--)
+        /// <inheritdoc/>
+        public override bool IsNumeric
         {
-          int idx = FindBarItem(text[i].ToString());
+            get { return false; }
+        }
 
-          checkC += idx * weightC;
-          checkK += idx * weightK;
+        private int FindBarItem(string c)
+        {
+            for (int i = 0; i < tabelle_93.Length; i++)
+            {
+                if (c == tabelle_93[i].c)
+                    return i;
+            }
 
-          weightC++;
+            return -1;
+        }
 
-          if (weightC > 20)
-            weightC = 1;
+        internal override string GetPattern()
+        {
+            string result = "111141";   // Startcode
 
-          weightK++;
+            foreach (char c in text)
+            {
+                int idx = FindBarItem(c.ToString());
+                if (idx < 0)
+                    throw new Exception(Res.Get("Messages,InvalidBarcode2"));
+                result += tabelle_93[idx].data;
+            }
 
-          if (weightK > 15)
-            weightC = 1;
-        };
+            // Checksums
+            if (CalcCheckSum)
+            {
+                int checkC = 0;
+                int checkK = 0;
 
-        checkK += checkC;
+                int weightC = 1;
+                int weightK = 2;
 
-        checkC = checkC % 47;
-        checkK = checkK % 47;
+                for (int i = text.Length - 1; i >= 0; i--)
+                {
+                    int idx = FindBarItem(text[i].ToString());
 
-        result += tabelle_93[checkC].data + tabelle_93[checkK].data;
-      }
-      
-      // Stopcode
-      result += "1111411";
+                    checkC += idx * weightC;
+                    checkK += idx * weightK;
 
-      return DoConvert(result);
+                    weightC++;
+
+                    if (weightC > 20)
+                        weightC = 1;
+
+                    weightK++;
+
+                    if (weightK > 15)
+                        weightK = 1;
+                };
+
+                checkK += checkC;
+
+                checkC = checkC % 47;
+                checkK = checkK % 47;
+
+                result += tabelle_93[checkC].data + tabelle_93[checkK].data;
+            }
+
+            // Stopcode
+            result += "1111411";
+
+            return DoConvert(result);
+        }
     }
-  }
 
-  /// <summary>
-  /// Generates the Code93 extended barcode.
-  /// </summary>
-  public class Barcode93Extended : Barcode93
-  {
-    private static string[] code93x = {
+    /// <summary>
+    /// Generates the Code93 extended barcode.
+    /// </summary>
+    public class Barcode93Extended : Barcode93
+    {
+        private static string[] code93x = {
       "]U", "[A", "[B", "[C", "[D", "[E", "[F", "[G",
       "[H", "[I", "[J", "[K", "[L", "[M", "[N", "[O",
       "[P", "[Q", "[R", "[S", "[T", "[U", "[V", "[W",
       "[X", "[Y", "[Z", "]A", "]B", "]C", "]D", "]E",
-      " ", "{A", "{B", "{C", "{D", "{E", "{F", "{G",
-      "{H", "{I", "{J", "{K", "{L", "{M", "{N", "{O",
+      " ", "{A", "{B", "{C", "$", "%", "{F", "{G",
+      "{H", "{I", "{J", "+", "{L", "-", ".", "/",
       "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",
       "8",  "9", "{Z", "]F", "]G", "]H", "]I", "]J",
       "]V",  "A",  "B",  "C",  "D",  "E",  "F",  "G",
@@ -171,20 +171,20 @@ namespace FastReport.Barcode
       "}X", "}Y", "}Z", "]P", "]Q", "]R", "]S", "]T"
     };
 
-    internal override string GetPattern()
-    {
-      string saveText = text;
-      text = "";
+        internal override string GetPattern()
+        {
+            string saveText = text;
+            text = "";
 
-      for (int i = 0; i < saveText.Length; i++)
-      {
-        if (saveText[i] <= (char)127)
-          text += code93x[saveText[i]];
-      }
+            for (int i = 0; i < saveText.Length; i++)
+            {
+                if (saveText[i] <= (char)127)
+                    text += code93x[saveText[i]];
+            }
 
-      string pattern = base.GetPattern();
-      text = saveText;
-      return pattern;
+            string pattern = base.GetPattern();
+            text = saveText;
+            return pattern;
+        }
     }
-  }
 }

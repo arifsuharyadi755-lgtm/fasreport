@@ -1,44 +1,103 @@
 ﻿using System;
+using System.Drawing;
 
 namespace FastReport.Web
 {
     public class ExportMenuSettings
-    {    
-        private const Exports defaultExports =
-            Exports.Prepared | Exports.Pdf | Exports.Excel2007 | Exports.Word2007 | Exports.Text | Exports.Rtf
-            | Exports.Xps | Exports.Ods | Exports.Odt | Exports.XmlExcel | Exports.Csv;
-     
-        private const Exports allExports =
-            Exports.Prepared | Exports.Pdf | Exports.Excel2007 | Exports.Word2007 | Exports.PowerPoint2007 | Exports.XmlExcel 
-            | Exports.Text | Exports.Rtf | Exports.Xps | Exports.Ods | Exports.Odt | Exports.Dbf | Exports.Csv | Exports.Mht
-            | Exports.HTML | Exports.Hpgl /*| Exports.Email*/ | Exports.Dxf | Exports.Json | Exports.LaTeX /*| Exports.Image*/
-            | Exports.Ppml | Exports.PS | Exports.Xaml | Exports.Zpl | Exports.Excel97 | Exports.Svg;
+    {
 
         /// <summary>
         /// Show Exports menu
         /// </summary>
         public bool Show { get; set; } = true;
-        
+
         /// <summary>
         /// Used to set exports in toolbar.
         /// </summary>
-        public Exports ExportTypes { get; set; } = defaultExports;
+        public Exports ExportTypes { get; set; } = Exports.Default;
+        /// <summary>
+        /// Used to change font family, style in export settings.
+        /// </summary>
+        public Font FontSettings { get; set; } = null;
+        /// <summary>
+        /// Used to change font color in export settings.
+        /// </summary>
+        public Color FontColor { get; set; } = Color.White;
+        /// <summary>
+        /// Used to change window, buttons color in export settings.
+        /// </summary>
+        public Color Color { get; set; } = Color.Maroon;
+
+        /// <summary>
+        /// Used to on/off export settings.
+        /// </summary>
+        public bool EnableSettings { get; set; } = false;
+
+        /// <summary>
+        /// If enabled, the container with the settings will be fixed on the screen and will be in the foreground.
+        /// </summary>
+        /// <remarks>
+        /// Default value: false
+        /// </remarks>
+        public bool PinnedSettingsPosition { get; set; } = false;
+        internal string UserFontSettingsStyle
+        {
+            get
+            {
+                if (FontSettings != null)
+                {
+                    return  FontSettings.Style + " ";
+                }
+                else
+                    return "";
+            }
+
+        }
+
+        internal string FixedContainerPosition
+        {
+            get => PinnedSettingsPosition ? "position: fixed; top: 0; left: 0;" : "";
+        }
+
+        internal string FixedContainerTags
+        {
+            get => PinnedSettingsPosition ? "position : fixed; top: 40%; left: 40%; transform: translate(-50%, -50%);" : "";
+        }
+
+        internal string UserFontSettingsFamily
+        {
+            get
+            {
+                if (FontSettings != null)
+                {
+                    return " " + FontSettings.OriginalFontName;
+                }
+                else
+                    return "Verdana,Arial";
+              
+            }
+        }
+
         /// <summary>
         /// Get an instance of ExportMenuSettings with default exports 
         /// <para>Default : Prepared, Pdf, Excel2007, Word2007, Text, Rtf, Xps, Ods, Odt, XmlExcel, Csv</para>
         /// </summary>
         public static ExportMenuSettings Default => new ExportMenuSettings
         {
-            ExportTypes = defaultExports
+            ExportTypes = Exports.Default
+
         };
+
         /// <summary>
         /// Get an instance of ExportMenuSettings with all exports 
         /// </summary>
         public static ExportMenuSettings All => new ExportMenuSettings
         {
-            ExportTypes = allExports
+            ExportTypes = Exports.All
+
         };
 
+      
         /// <summary>
         /// Switch a visibility of prepared report export in toolbar
         /// </summary>
@@ -49,6 +108,7 @@ namespace FastReport.Web
         }
 
 #if !OPENSOURCE
+
         /// <summary>
         /// Switches a visibility of PDF (Adobe Acrobat) export in toolbar.
         /// </summary>
@@ -170,17 +230,24 @@ namespace FastReport.Web
             get => GetExport(Exports.Hpgl);
             set => SetExport(value, Exports.Hpgl);
         }
-        //public bool ShowEmailExport
-        //{
-        //    get => (ExportTypes & Exports.Email) > 0;
-        //    set
-        //    {
-        //        if (value)
-        //            ExportTypes |= Exports.Email;
-        //        else
-        //            ExportTypes &= ~Exports.Email;
-        //    }
-        //}
+
+#if !WASM
+        /// <summary>
+        /// Switches visibility the Email export in toolbar.
+        /// </summary>
+        public bool ShowEmailExport
+        {
+            get => GetExport(Exports.Email);
+            set
+            {
+                if (Infrastructure.FastReportGlobal.InternalEmailExportOptions is null)
+                    throw new Exception("Please add your account information when registering for services. Use services.AddFastReport(options => options.EmailExportOptions = new EmailExportOptions() {...} )");
+
+                SetExport(value, Exports.Email);
+            }
+        }
+#endif
+
         /// <summary>
         /// Switches visibility the DXF export in toolbar.
         /// </summary>
@@ -205,17 +272,14 @@ namespace FastReport.Web
             get => GetExport(Exports.LaTeX);
             set => SetExport(value, Exports.LaTeX);
         }
-        //public bool ShowImageExport
-        //{
-        //    get => (ExportTypes & Exports.Image) > 0;
-        //    set
-        //    {
-        //        if (value)
-        //            ExportTypes |= Exports.Image;
-        //        else
-        //            ExportTypes &= ~Exports.Image;
-        //    }
-        //}
+        /// <summary>
+        /// Switches a visibility of Image export in toolbar.
+        /// </summary>
+        public bool ShowImageExport
+        {
+            get => GetExport(Exports.Image);
+            set => SetExport(value, Exports.Image);
+        }
         /// <summary>
         /// Switches visibility the PPML export in toolbar.
         /// </summary>
@@ -302,16 +366,23 @@ namespace FastReport.Web
         Mht = 8192,
         HTML = 16384,
         Hpgl = 32768,
-        //Email = 65536,
+        Email = 65536,
         Dxf = 131_072,
         Json = 262_144,
         LaTeX = 524_288,
-        //Image = 1_048_576,
+        Image = 1_048_576,
         Ppml = 2_097_152,
         PS = 4_194_304,
         Xaml = 8_388_608,
         Zpl = 16_777_216,
         Excel97 = 33_554_432,
         Svg = 67_108_864,
+
+        Default = Prepared | Pdf | Excel2007 | Word2007 | Text | Rtf
+            | Xps | Ods | Odt | XmlExcel | Csv,
+
+        All = Default | PowerPoint2007 | Dbf | Mht
+            | HTML | Hpgl /*| Email*/ | Dxf | Json | LaTeX | Image
+            | Ppml | PS | Xaml | Zpl | Excel97 | Svg,
     }
 }

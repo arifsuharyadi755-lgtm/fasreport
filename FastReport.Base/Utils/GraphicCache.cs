@@ -126,10 +126,10 @@ namespace FastReport
                 result.FormatFlags = flags;
                 float[] tabStops = new float[64];
                 // fixed issue 2823
-                tabStops[0] = firstTab;
+                tabStops[0] = firstTab < 0 ? 0 : firstTab;
                 for (int i = 1; i < 64; i++)
                 {
-                    tabStops[i] = tabWidth;
+                    tabStops[i] = tabWidth < 0 ? 0 : tabWidth;
                 }
                 result.SetTabStops(0, tabStops);
                 stringFormats[hash] = result;
@@ -150,7 +150,7 @@ namespace FastReport
         /// <returns>The <b>StringFormat</b> object.</returns>
         public StringFormat GetStringFormat(StringAlignment align, StringAlignment lineAlign,
           StringTrimming trimming, StringFormatFlags flags, float firstTab, FloatCollection tabWidth,
-          float defaultTab)
+          float defaultTab = 48)
         {
             int hash = align.GetHashCode() ^ (lineAlign.GetHashCode() << 2) ^ (trimming.GetHashCode() << 5) ^
               (flags.GetHashCode() << 16) ^ (100 - firstTab).GetHashCode() ^ tabWidth.GetHashCode();
@@ -163,16 +163,22 @@ namespace FastReport
                 result.Trimming = trimming;
                 result.FormatFlags = flags;
                 float[] tabStops = new float[64];
+                float sumWidth = firstTab;
                 // fixed issue 2823
-                tabStops[0] = firstTab;
+                tabStops[0] = firstTab < 0 ? 0 : firstTab;
                 for (int i = 1; i < 64; i++)
                 {
                     if (i > tabWidth.Count)
                     {
-                        tabStops[i] = defaultTab;
+                        tabStops[i] = defaultTab < 0 ? 0 : defaultTab;
+                        //tab stops have static positions we need to go back to them
+                        if (sumWidth % defaultTab != 0)
+                            tabStops[i] = defaultTab - sumWidth % defaultTab;
+                        sumWidth += tabStops[i];
                         continue;
                     }
-                    tabStops[i] = tabWidth[i - 1];
+                    tabStops[i] = tabWidth[i - 1] < 0 ? 0 : tabWidth[i - 1];
+                    sumWidth += tabStops[i];
                 }
                 result.SetTabStops(0, tabStops);
                 stringFormats[hash] = result;

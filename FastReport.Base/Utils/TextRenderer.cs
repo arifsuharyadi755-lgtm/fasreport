@@ -47,28 +47,29 @@ namespace FastReport.Utils
     public class AdvancedTextRenderer
     {
         #region Fields
-        private List<Paragraph> paragraphs;
-        private string text;
-        private IGraphics graphics;
-        private Font font;
-        private Brush brush;
-        private Pen outlinePen;
-        private RectangleF displayRect;
-        private StringFormat format;
-        private HorzAlign horzAlign;
-        private VertAlign vertAlign;
-        private float lineHeight;
-        private float fontLineHeight;
-        private int angle;
-        private float widthRatio;
-        private bool forceJustify;
-        private bool wysiwyg;
-        private bool htmlTags;
-        private bool pDFMode;
+        private readonly List<Paragraph> paragraphs;
+        private readonly string text;
+        private readonly IGraphics graphics;
+        private readonly Font font;
+        private readonly Brush brush;
+        private readonly Pen outlinePen;
+        private readonly RectangleF displayRect;
+        private readonly StringFormat format;
+        private readonly HorzAlign horzAlign;
+        private readonly VertAlign vertAlign;
+        private readonly float lineHeight;
+        private readonly float fontLineHeight;
+        private readonly int angle;
+        private readonly float widthRatio;
+        private readonly bool forceJustify;
+        private readonly bool wysiwyg;
+        private readonly bool htmlTags;
+        private readonly bool pDFMode;
         private float spaceWidth;
         private float scale;
         private InlineImageCache cache;
         private float fontScale;
+        private bool hasLineHeight;
         #endregion
 
         #region Properties
@@ -157,6 +158,11 @@ namespace FastReport.Utils
             get { return htmlTags; }
         }
 
+        public bool HasLineHeight
+        {
+            get { return hasLineHeight; }
+        }
+
         public float TabSize
         {
             get
@@ -200,7 +206,14 @@ namespace FastReport.Utils
 
         internal float SpaceWidth
         {
-            get { return spaceWidth; }
+            get
+            {
+                if (spaceWidth < 0)
+                {
+                    spaceWidth = CalculateSpaceSize(graphics, font);
+                }
+                return spaceWidth;
+            }
         }
 
         /// <summary>
@@ -237,7 +250,7 @@ namespace FastReport.Utils
             StyleDescriptor style = new StyleDescriptor(Font.Style, BrushColor, BaseLine.Normal);
             if (HtmlTags)
                 text = text.Replace("<br>", "\r\n").Replace("<br/>", "\r\n").Replace("<br />", "\r\n");
-            string[] lines = text.Split(new char[] { '\n' });
+            string[] lines = text.Split('\n', '\v');
             int originalCharIndex = 0;
 
             foreach (string line in lines)
@@ -268,20 +281,12 @@ namespace FastReport.Utils
 
         private void AdjustParagraphLines()
         {
-            // calculate text height
-            float height = 0;
-            height = CalcHeight();
-            /*foreach (Paragraph paragraph in Paragraphs)
-            {
-              height += paragraph.Lines.Count * LineHeight;
-            }*/
-
             // calculate Y offset
             float offsetY = DisplayRect.Top;
             if (VertAlign == VertAlign.Center)
-                offsetY += (DisplayRect.Height - height) / 2;
+                offsetY += (DisplayRect.Height - CalcHeight()) / 2;
             else if (VertAlign == VertAlign.Bottom)
-                offsetY += (DisplayRect.Height - height) - 1;
+                offsetY += (DisplayRect.Height - CalcHeight()) - 1;
 
             for (int i = 0; i < Paragraphs.Count; i++)
             {
@@ -399,6 +404,7 @@ namespace FastReport.Utils
           bool forceJustify, bool wysiwyg, bool htmlTags, bool pdfMode,
           float scale, float fontScale, InlineImageCache cache, bool isPrinting = false)
         {
+            hasLineHeight = lineHeight != 0;
             this.cache = cache;
             this.scale = scale;
             this.fontScale = fontScale;
@@ -414,10 +420,10 @@ namespace FastReport.Utils
             this.vertAlign = vertAlign;
             this.lineHeight = lineHeight;
             fontLineHeight = font.GetHeight(g.Graphics);
-            if (this.lineHeight == 0)
+            if (!hasLineHeight)
             {
                 this.lineHeight = fontLineHeight;
-                if (isPrinting && Config.IsRunningOnMono && DrawUtils.GetMonoRendering(g.Graphics) == MonoRendering.Pango)
+                if (isPrinting && Config.IsRunningOnMono && DrawUtils.GetMonoRendering(g) == MonoRendering.Pango)
                 {
                     // we need this in order to fix inconsistent line spacing when print using Pango rendering
                     this.lineHeight = fontLineHeight * 1.33f;
@@ -429,7 +435,7 @@ namespace FastReport.Utils
             this.wysiwyg = wysiwyg;
             this.htmlTags = htmlTags;
             pDFMode = pdfMode;
-            spaceWidth = CalculateSpaceSize(g, font);// g.MeasureString(" ", font).Width;
+            this.spaceWidth = -1;
 
             StringFormatFlags saveFlags = Format.FormatFlags;
             StringTrimming saveTrimming = Format.Trimming;
@@ -477,10 +483,10 @@ namespace FastReport.Utils
         public class Paragraph
         {
             #region Fields
-            private List<Line> lines;
-            private AdvancedTextRenderer renderer;
-            private string text;
-            private int originalCharIndex;
+            private readonly List<Line> lines;
+            private readonly AdvancedTextRenderer renderer;
+            private readonly string text;
+            private readonly int originalCharIndex;
             #endregion
 
             #region Properties
@@ -532,7 +538,7 @@ namespace FastReport.Utils
                     int linesFit = 0;
                     // END: The fix for linux and core app a264aae5-193b-4e5c-955c-0818de3ca01b
                     Renderer.Graphics.MeasureString(text, Renderer.Font,
-                      new SizeF(Renderer.DisplayRect.Width - left, Renderer.FontLineHeight * 1.25f), 
+                      new SizeF(Renderer.DisplayRect.Width - left, Renderer.FontLineHeight * 1.25f),
                       Renderer.Format, out charsFit, out linesFit);
                     return charsFit + tabFit;
                 }
@@ -565,7 +571,7 @@ namespace FastReport.Utils
                             break;
                         }
 
-                        string textFit = text.Substring(0, charsFit).TrimEnd(new char[] { ' ' });
+                        string textFit = text.Substring(0, charsFit).TrimEnd(' ');
                         lines.Add(new Line(textFit, this, originalCharIndex));
                         text = text.Substring(charsFit)
                                         // Fix for linux system
@@ -1117,15 +1123,15 @@ namespace FastReport.Utils
         public class Line
         {
             #region Fields
-            private List<Word> words;
-            private string text;
-            private bool hasTabs;
-            private Paragraph paragraph;
+            private readonly List<Word> words;
+            private readonly string text;
+            private readonly bool hasTabs;
+            private readonly Paragraph paragraph;
             private float top;
             private float width;
-            private int originalCharIndex;
-            private List<RectangleF> underlines;
-            private List<RectangleF> strikeouts;
+            private readonly int originalCharIndex;
+            private readonly List<RectangleF> underlines;
+            private readonly List<RectangleF> strikeouts;
             #endregion
 
             #region Properties
@@ -1385,7 +1391,7 @@ namespace FastReport.Utils
                 hasTabs = text.Contains("\t");
 
                 // split text by spaces
-                string[] words = text.Split(new char[] { ' ' });
+                string[] words = text.Split(' ');
                 string textWithSpaces = "";
 
                 foreach (string word in words)
@@ -1396,7 +1402,7 @@ namespace FastReport.Utils
                     {
                         // split text by tabs
                         textWithSpaces += word;
-                        string[] tabWords = textWithSpaces.Split(new char[] { '\t' });
+                        string[] tabWords = textWithSpaces.Split('\t');
 
                         foreach (string word1 in tabWords)
                         {
@@ -1448,8 +1454,8 @@ namespace FastReport.Utils
         public class Word
         {
             #region Fields
-            private List<Run> runs;
-            protected string text;
+            private readonly List<Run> runs;
+            private readonly string text;
             private float left;
             private float width;
             internal Line line;
@@ -1568,8 +1574,7 @@ namespace FastReport.Utils
                     {
                         GraphicsPath path = new GraphicsPath();
                         path.AddString(Text, font.FontFamily, Convert.ToInt32(font.Style), Renderer.Graphics.DpiY * font.Size / 72, new PointF(Left - 1, Top - 1), Renderer.Format);
-                        Renderer.Graphics.FillPath(Renderer.Brush, path);
-                        Renderer.Graphics.DrawPath(Renderer.OutlinePen, path);
+                        Renderer.Graphics.FillAndDrawPath(Renderer.OutlinePen, Renderer.Brush, path);
                     }
 
                     if (disposeFont)
@@ -1595,6 +1600,16 @@ namespace FastReport.Utils
                 }
                 else
                 {
+                    // not needed anymore; skia now uses metrics of original font in case of font fallback
+                    /*#if SKIA
+                                        // we need actual height of a text because it may have font fallback with different metrics
+                                        if (!string.IsNullOrEmpty(text) && !Renderer.HasLineHeight)
+                                        {
+                                            var stringHeight = DrawUtils.MeasureString(Renderer.Graphics.Graphics, text, Renderer.Font, Renderer.Format).Height;
+
+                                            return Renderer.FontLineHeight > stringHeight ? Renderer.FontLineHeight : stringHeight;
+                                        }
+                    #endif*/
                     return Renderer.LineHeight;
                 }
             }
@@ -1750,11 +1765,11 @@ namespace FastReport.Utils
         public class Run
         {
             #region Fields
-            protected string text;
-            private StyleDescriptor style;
-            protected Word word;
+            protected readonly string text;
+            private readonly StyleDescriptor style;
+            protected readonly Word word;
             private float left;
-            protected float width;
+            protected readonly float width;
             protected float lineHeight;
             protected float fontLineHeight;
             private float baseLine;
@@ -1880,7 +1895,7 @@ namespace FastReport.Utils
                 {
                     if (spaceWidth < 0)
                     {
-                        spaceWidth = CalculateSpaceSize(Renderer.Graphics, GetFont());// Renderer.Graphics.MeasureString(" ", GetFont()).Width;
+                        spaceWidth = CalculateSpaceSize(Renderer.Graphics, GetFont());
                     }
                     return spaceWidth;
                 }
@@ -2052,6 +2067,7 @@ namespace FastReport.Utils
         public static void Draw(string text, IGraphics g, Font font, Brush brush, Pen outlinePen,
           RectangleF rect, StringFormat format, int angle, float widthRatio)
         {
+            text = text.Replace('\v', '\n');
             IGraphicsState state = g.Save();
             g.SetClip(rect, CombineMode.Intersect);
             g.TranslateTransform(rect.Left + rect.Width / 2, rect.Top + rect.Height / 2);
@@ -2074,8 +2090,7 @@ namespace FastReport.Utils
             {
                 GraphicsPath path = new GraphicsPath();
                 path.AddString(text, font.FontFamily, Convert.ToInt32(font.Style), g.DpiY * font.Size / 72, rect, format);
-                g.FillPath(brush, path);
-                g.DrawPath(outlinePen, path);
+                g.FillAndDrawPath(outlinePen, brush, path);
             }
 
             g.Restore(state);
@@ -2096,7 +2111,7 @@ namespace FastReport.Utils
 
         private bool serialized;
 
-        private object locker;
+        private readonly object locker;
 
         #endregion Private Fields
 
@@ -2397,15 +2412,15 @@ namespace FastReport.Utils
                             return image;
                         if (stream != null)
                         {
-                            MemoryStream ms = new MemoryStream(stream);
-                            image = Bitmap.FromStream(ms);
+
+                            image = ImageHelper.Load(stream);
                             return image;
                         }
                         if (base64 != null)
                         {
                             this.stream = Convert.FromBase64String(base64);
-                            MemoryStream ms = new MemoryStream(stream);
-                            image = Bitmap.FromStream(ms);
+
+                            image = ImageHelper.Load(stream);
                             return image;
                         }
                     }
@@ -2465,8 +2480,7 @@ namespace FastReport.Utils
                 base64 = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAFdJREFUOE9jbGlq+c9AIqipq2GEawEZQAo4dvgYqoXD0QAGhv9ATyKCBY1PXBjANKEbBjSWOANA9mPRDBImzgCKXECVMMCTsojzwtAzAOQvUjCJmRe/cgDt6ZAkZx23LwAAAABJRU5ErkJggg==";
                 src = "data:image/png;base64," + base64;
                 stream = Convert.FromBase64String(base64);
-                using (MemoryStream ms = new MemoryStream(stream))
-                    image = Bitmap.FromStream(ms);
+                image = ImageHelper.Load(stream);
                 return image;
             }
 

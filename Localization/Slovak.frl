@@ -101,6 +101,7 @@
     </Shapes>
     <PictureObject Text="Obrázok"/>
     <TableObject Text="Tabuľka"/>
+    <Matrix Text="Matica"/>
     <MatrixObject Text="Matica"/>
     <SubreportObject Text="Podzostava"/>
     <BarcodeObject Text="Čiarový kód"/>
@@ -149,7 +150,7 @@
     <MdbFile Text="MS Access databáza (*.mdb)|*.mdb"/>
     <MdfFile Text="Microsoft SQL Server databáza (*.mdf)|*.mdf"/>
     <RtfFile Text="Formátovaný text (*.rtf)|*.rtf"/>
-    <Images Text="Obrázky |*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Obrázky |*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Assembly (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="Tlačové súbory (*.prn)|*.prn"/>
     <BmpFile Text="Rastrový obrázok (*.bmp)|*.bmp"/>
@@ -1347,7 +1348,7 @@
       <InsertToRight Text="Vložiť stĺpec vpravo"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Zlúčiť bunky"/>
+      <Merge Text="Zlúčiť bunky"/>
       <Split Text="Rozdeliť bunku"/>
     </TableCell>
     <MatrixObject>
@@ -1489,14 +1490,14 @@
     <Ods Text="Export do Open Office Calc">
       <File Text="OpenOffice Calc"/>
     </Ods>
-    <Xlsx Text="Export do Excel 2007">
-      <File Text="Excel 2007"/>
+    <Xlsx Text="Export do Microsoft Excel">
+      <File Text="Microsoft Excel"/>
     </Xlsx>
-    <Pptx Text="Export do PowerPoint 2007">
-      <File Text="PowerPoint 2007"/>
+    <Pptx Text="Export do Microsoft PowerPoint">
+      <File Text="Microsoft PowerPoint"/>
     </Pptx>
-    <Docx Text="Export do Microsoft Word 2007">
-      <File Text="Microsoft Word 2007"/>
+    <Docx Text="Export do Microsoft Word">
+      <File Text="Microsoft Word"/>
     </Docx>
     <Xps Text="Export do Microsoft XML Paper Specification">
       <File Text="Microsoft XML Paper Specification"/>

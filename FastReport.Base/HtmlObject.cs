@@ -113,8 +113,8 @@ namespace FastReport
 
                 if (textRect.Width > 0 && textRect.Height > 0)
                 {
-                        // use simple rendering
-                        g.DrawString(text, font, textBrush, textRect, format);
+                    // use simple rendering
+                    g.DrawString(text, font, textBrush, textRect, format);
                 }
             }
         }
@@ -130,23 +130,6 @@ namespace FastReport
             DrawDesign(e);
         }
 
-        /// <inheritdoc/>
-        public override void ApplyStyle(Style style)
-        {
-            base.ApplyStyle(style);
-        }
-
-        /// <inheritdoc/>
-        public override void SaveStyle()
-        {
-            base.SaveStyle();
-        }
-
-        /// <inheritdoc/>
-        public override void RestoreStyle()
-        {
-            base.RestoreStyle();
-        }
 
         /// <inheritdoc/>
         public override void Serialize(FRWriter writer)
@@ -181,7 +164,7 @@ namespace FastReport
 
             if (AllowExpressions && !String.IsNullOrEmpty(Brackets))
             {
-                string[] brackets = Brackets.Split(new char[] { ',' });
+                string[] brackets = Brackets.Split(',');
                 // collect expressions found in the text
                 expressions.AddRange(CodeUtils.GetExpressions(Text, brackets[0], brackets[1]));
             }
@@ -222,13 +205,17 @@ namespace FastReport
         public override void GetData()
         {
             base.GetData();
+            GetDataShared();
+        }
 
+        private void GetDataShared()
+        {
             // process expressions
             if (AllowExpressions)
             {
                 if (!String.IsNullOrEmpty(Brackets))
                 {
-                    string[] brackets = Brackets.Split(new char[] { ',' });
+                    string[] brackets = Brackets.Split(',');
                     FindTextArgs args = new FindTextArgs();
                     args.Text = new FastString(Text);
                     args.OpenBracket = brackets[0];
@@ -238,7 +225,7 @@ namespace FastReport
                     while (args.StartIndex < args.Text.Length)
                     {
                         string expression = CodeUtils.GetExpression(args, false);
-                        if (expression == "")
+                        if (expression == null)
                             break;
 
                         string formattedValue = CalcAndFormatExpression(expression, expressionIndex);

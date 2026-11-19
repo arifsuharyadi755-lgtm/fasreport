@@ -448,18 +448,10 @@ namespace FastReport
                 {
                     if ((c.Anchor & AnchorStyles.Right) != 0)
                     {
-                        // Save width of right anchor when page has unlimited width and its width is increasing.
-                        if (Page != null && (Page as ReportPage).UnlimitedWidth && dx > 0)
-                            c.RightAnchorWidth = Width - c.Right;
-
                         if ((c.Anchor & AnchorStyles.Left) != 0)
                             c.Width += dx;
                         else
                             c.Left += dx;
-
-                        // Restore width of right anchor when page has unlimited width and its width is decreasing.
-                        if (Page != null && (Page as ReportPage).UnlimitedWidth && dx < 0)
-                            c.Width = PageWidth - c.RightAnchorWidth - c.Left;
                     }
                     else if ((c.Anchor & AnchorStyles.Left) == 0)
                     {
@@ -533,6 +525,7 @@ namespace FastReport
             BeforeLayoutEvent = src.BeforeLayoutEvent;
             AfterLayoutEvent = src.AfterLayoutEvent;
             RepeatBandNTimes = src.RepeatBandNTimes;
+            IsLastRow = src.IsLastRow;
         }
 
         internal virtual void UpdateWidth()
@@ -546,85 +539,10 @@ namespace FastReport
             }
         }
 
-        internal void FixHeight()
+        /// <inheritdoc/>
+        public override List<ValidationError> Validate()
         {
-            float maxHeight = Height;
-            foreach (ReportComponentBase c in Objects)
-            {
-                if (c.Bottom > maxHeight)
-                    maxHeight = c.Bottom;
-            }
-            if (maxHeight < 0)
-                maxHeight = 0;
-            Height = maxHeight;
-        }
-
-        internal void FixHeightWithComponentsShift(float deltaY)
-        {
-            float minTop = Height;
-            float maxBottom = 0;
-            float minHeight = Height;
-
-            // Calculate minimum top of all components on this band.
-            foreach (ReportComponentBase component in Objects)
-            {
-                if (component.Top < minTop)
-                {
-                    minTop = component.Top;
-                }
-            }
-
-            // Calculate maximum bottom of all components on this band.
-            foreach (ReportComponentBase component in Objects)
-            {
-                if (component.Bottom > maxBottom)
-                {
-                    maxBottom = component.Bottom;
-                }
-            }
-
-            // Calculate minimum height of band with components shift.
-            minHeight = maxBottom - minTop;
-
-            // Minimum height with compenents shift can't be negative.
-            if (minHeight < 0)
-            {
-                minHeight = 0;
-            }
-
-            // Prevent incorrect movement of objects when mouse moves too fast.
-            if (minTop < deltaY)
-            {
-                deltaY = minTop;
-            }
-
-            // Size of band should be decreased.
-            if (deltaY > 0)
-            {
-                // There is enough place to move components up.
-                if (minTop > 0)
-                {
-                    // Move all components up.
-                    foreach (ReportComponentBase component in Objects)
-                    {
-                        component.Top -= deltaY;
-                    }
-                }
-            }
-            else
-            {
-                // Move all components down.
-                foreach (ReportComponentBase component in Objects)
-                {
-                    component.Top -= deltaY;
-                }
-            }
-
-            // Height can't be less then minHeight.
-            if (Height < minHeight)
-            {
-                Height = minHeight;
-            }
+            return new List<ValidationError>();
         }
 
         /// <inheritdoc/>
@@ -738,7 +656,7 @@ namespace FastReport
             }
             SetRunning(false);
 
-            ReportComponentCollection collection_clone = new ReportComponentCollection(); 
+            ReportComponentCollection collection_clone = new ReportComponentCollection();
             Objects.CopyTo(collection_clone);
             foreach (ReportComponentBase obj in collection_clone)
             {
@@ -824,7 +742,9 @@ namespace FastReport
             foreach (ReportComponentBase obj in Objects)
             {
                 if (obj.GrowToBottom)
+                {
                     obj.Height = Height - obj.Top;
+                }
             }
 
             OnAfterLayout(EventArgs.Empty);
@@ -835,10 +755,15 @@ namespace FastReport
         public void AddLastToFooter(BreakableComponent breakTo)
         {
             float maxTop = (AllObjects[0] as ComponentBase).Top;
-            foreach (ComponentBase obj in AllObjects)
-                if (obj.Top > maxTop && !(obj is DataFooterBand))
-                    maxTop = obj.Top;
-
+            for (int i = 0; i < AllObjects.Count; i++)
+            {
+                if (AllObjects[i] is ComponentBase)
+                {
+                    ComponentBase obj = AllObjects[i] as ComponentBase;
+                    if (obj.Top > maxTop && !(obj is DataFooterBand))
+                        maxTop = obj.Top;
+                }
+            }
             float breakLine = maxTop;
 
             List<ReportComponentBase> pasteList = new List<ReportComponentBase>();
@@ -879,15 +804,18 @@ namespace FastReport
             float maxBottom = 0;
 
             for (int i = itemsBefore; i < breakTo.AllObjects.Count; i++)
-                if ((breakTo.AllObjects[i] as ComponentBase).Top < minTop && breakTo.AllObjects[i] is ReportComponentBase && !(breakTo.AllObjects[i] is Table.TableCell))
-                    minTop = (breakTo.AllObjects[i] as ComponentBase).Top;
+                if (breakTo.AllObjects[i] is ComponentBase)
+                    if ((breakTo.AllObjects[i] as ComponentBase).Top < minTop && breakTo.AllObjects[i] is ReportComponentBase && !(breakTo.AllObjects[i] is Table.TableCell))
+                        minTop = (breakTo.AllObjects[i] as ComponentBase).Top;
 
             for (int i = itemsBefore; i < breakTo.AllObjects.Count; i++)
-                if ((breakTo.AllObjects[i] as ComponentBase).Bottom > maxBottom && breakTo.AllObjects[i] is ReportComponentBase && !(breakTo.AllObjects[i] is Table.TableCell))
-                    maxBottom = (breakTo.AllObjects[i] as ComponentBase).Bottom;
+                if (breakTo.AllObjects[i] is ComponentBase)
+                    if ((breakTo.AllObjects[i] as ComponentBase).Bottom > maxBottom && breakTo.AllObjects[i] is ReportComponentBase && !(breakTo.AllObjects[i] is Table.TableCell))
+                        maxBottom = (breakTo.AllObjects[i] as ComponentBase).Bottom;
 
             for (int i = 0; i < itemsBefore; i++)
-                (breakTo.AllObjects[i] as ComponentBase).Top += maxBottom - minTop;
+                if (breakTo.AllObjects[i] is ComponentBase)
+                    (breakTo.AllObjects[i] as ComponentBase).Top += maxBottom - minTop;
 
             breakTo.Height += maxBottom - minTop;
 
@@ -950,7 +878,7 @@ namespace FastReport
                         breakComp.CanGrow = true;
                         breakComp.CanShrink = false;
                         breakComp.Height -= breakLine - obj.Top;
-                        breakComp.Top = 0;
+                        breakComp.Top = 0; 
                         obj.Height = breakLine - obj.Top;
                         (obj as BreakableComponent).Break(breakComp);
                     }
@@ -960,6 +888,9 @@ namespace FastReport
                         // in case of bottom anchor, do not move the object. It will be moved automatically when we decrease the band height
                         if ((obj.Anchor & AnchorStyles.Bottom) == 0)
                             obj.Top -= breakLine;
+
+                        // add 0.01 to make sure we're below the breaked object. This is necessary due to rounding errors (in some rare cases)
+                        obj.Top += 0.01f;
                         obj.Parent = breakTo;
                         continue;
                     }
@@ -1041,7 +972,7 @@ namespace FastReport
             InvokeEvent(AfterLayoutEvent, e);
         }
 
-#endregion
+        #endregion
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BandBase"/> class with default settings.

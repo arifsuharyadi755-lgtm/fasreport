@@ -8,6 +8,9 @@ namespace FastReport.Gauge.Radial
     /// <summary>
     /// Represents a linear pointer.
     /// </summary>
+#if !DEBUG
+    [DesignTimeVisible(false)]
+#endif
     public class RadialPointer : GaugePointer
     {
         #region Fields
@@ -19,12 +22,13 @@ namespace FastReport.Gauge.Radial
         /// Gets or sets the value, indicating that gradient should be rotated automatically
         /// </summary>
         [Browsable(true)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public bool GradientAutoRotate
         {
             get { return gradAutoRotate; }
             set { gradAutoRotate = value; }
         }
-        
+
         #region Constructors
 
         /// <summary>
@@ -50,7 +54,7 @@ namespace FastReport.Gauge.Radial
             PointF center = (Parent as RadialGauge).Center;
             float circleWidth = Parent.Width / 16f;
             float circleHeight = Parent.Height / 16f;
-            RectangleF pointerCircle = new RectangleF(center.X - circleWidth/2 * e.ScaleX, center.Y - circleHeight/2 * e.ScaleY, circleWidth * e.ScaleX, circleHeight * e.ScaleY);
+            RectangleF pointerCircle = new RectangleF(center.X - circleWidth / 2 * e.ScaleX, center.Y - circleHeight / 2 * e.ScaleY, circleWidth * e.ScaleX, circleHeight * e.ScaleY);
 
             //double rotateTo = (scale.AverageValue - Parent.Minimum);
             double startAngle = -135 * RadialGauge.Radians;
@@ -60,7 +64,7 @@ namespace FastReport.Gauge.Radial
                 if ((Parent as RadialGauge).Position == RadialGaugePosition.Bottom || (Parent as RadialGauge).Position == RadialGaugePosition.Top)
                 {
                     startAngle = -90 * RadialGauge.Radians;
-                    if((Parent as RadialGauge).Position == RadialGaugePosition.Bottom)
+                    if ((Parent as RadialGauge).Position == RadialGaugePosition.Bottom)
                         angle *= -1;
                 }
                 else if ((Parent as RadialGauge).Position == RadialGaugePosition.Left)
@@ -102,12 +106,12 @@ namespace FastReport.Gauge.Radial
             pointerPerpStrt = RadialUtils.RotateVector(pointerPerpStrt, startAngle, center);
             pointerPerpEnd = RadialUtils.RotateVector(pointerPerpEnd, startAngle, center);
 
-            PointF[] rotatedPointerPerpStrt = RadialUtils.RotateVector(pointerPerpStrt, angle, center); 
+            PointF[] rotatedPointerPerpStrt = RadialUtils.RotateVector(pointerPerpStrt, angle, center);
             PointF[] rotatedPointerPerpEnd = RadialUtils.RotateVector(pointerPerpEnd, angle, center);
 
             //calc brush rect
             float x = 0, y = 0, dx = 0, dy = 0;
-            if(angle / RadialGauge.Radians >= 0 && angle / RadialGauge.Radians < 45)
+            if (angle / RadialGauge.Radians >= 0 && angle / RadialGauge.Radians < 45)
             {
                 x = rotatedPointerPerpEnd[1].X;
                 y = rotatedPointerPerpEnd[0].Y - (rotatedPointerPerpEnd[0].Y - pointerCircle.Y);
@@ -160,11 +164,9 @@ namespace FastReport.Gauge.Radial
             path.AddLines(p);
             path.AddLine(p[3], p[0]);
 
-            g.FillEllipse(brush, pointerCircle);
-            g.DrawEllipse(pen, pointerCircle);
+            g.FillAndDrawEllipse(pen, brush, pointerCircle);
 
-            g.FillPath(brush, path);
-            g.DrawPath(pen, path);
+            g.FillAndDrawPath(pen, brush, path);
         }
 
         #endregion // Private Methods
@@ -172,24 +174,10 @@ namespace FastReport.Gauge.Radial
         #region Public Methods
 
         /// <inheritdoc/>
-        public override void Assign(GaugePointer src)
-        {
-            base.Assign(src);
-
-            RadialPointer s = src as RadialPointer;
-        }
-
-        /// <inheritdoc/>
         public override void Draw(FRPaintEventArgs e)
         {
             base.Draw(e);
             DrawHorz(e);
-        }
-
-        /// <inheritdoc/>
-        public override void Serialize(FRWriter writer, string prefix, GaugePointer diff)
-        {
-            base.Serialize(writer, prefix, diff);
         }
 
         #endregion // Public Methods

@@ -21,10 +21,15 @@ namespace FastReport.Engine
                 {
                     band.GetData();
                 }
-                TranslateObjects(band);
-                RenderInnerSubreports(band);
-                band.CalcHeight();
+                PrepareBandShared(band);
             }
+        }
+
+        private void PrepareBandShared(BandBase band)
+        {
+            TranslateObjects(band);
+            RenderInnerSubreports(band);
+            band.CalcHeight();
         }
 
         private float CalcHeight(BandBase band)
@@ -89,11 +94,42 @@ namespace FastReport.Engine
             }
         }
 
+        /// <summary>
+        /// Check if there is a parent in the band hierarchy that cannot start a new page.
+        /// Because if the parent can't start the new page, then this band can't either.
+        /// </summary>
+        /// <param name="band">The BandBase instance to check.</param>
+        /// <returns><b>false</b> if band has at least one parent, which can't start new page.</returns>
+        private bool BandCanStartNewPage(BandBase band)
+        {
+            // Check conditions:
+            // - StartNewPage of band is turned on;
+            // - band has a parent;
+            // - parent is band, not page, component etc.
+            if (band.StartNewPage && band.Parent != null && band.Parent is BandBase)
+            {
+                BandBase parent = band.Parent as BandBase;
+                // While there is a parent, move up the hierarchy to it.
+                while (parent != null)
+                {
+                    // Parent can't start new page.
+                    if (!parent.FlagUseStartNewPage)
+                        return false;
+
+                    parent = parent.Parent as BandBase;
+                }
+            }
+            return true;
+        }
+
         private void ShowBandToPreparedPages(BandBase band, bool getData)
         {
+            bool bandCanStartNewPage = true;
+            bandCanStartNewPage = BandCanStartNewPage(band);
+
             // handle "StartNewPage". Skip if it's the first row, avoid empty first page.
-            if ((band.StartNewPage && !(band.Parent is PageHeaderBand)) && band.FlagUseStartNewPage && (band.RowNo != 1 || band.FirstRowStartsNewPage) &&
-                !band.Repeated)
+            if (band.StartNewPage && band.FlagUseStartNewPage && bandCanStartNewPage &&
+                (band.RowNo != 1 || band.FirstRowStartsNewPage) && !band.Repeated)
             {
                 EndColumn();
             }
@@ -105,7 +141,19 @@ namespace FastReport.Engine
 
                 if (band.Visible)
                 {
-                    AddToPreparedPages(band);
+                    if (BandHasHardPageBreaks(band))
+                    {
+                        foreach (var b in SplitHardPageBreaks(band))
+                        {
+                            if (b.StartNewPage)
+                                EndColumn();
+                            AddToPreparedPages(b);
+                        }
+                    }
+                    else
+                    {
+                        AddToPreparedPages(band);
+                    }
                 }
             }
             finally
@@ -215,7 +263,7 @@ namespace FastReport.Engine
             {
                 object expression = null;
                 // Calculate expressions with TotalPages only on FinalPass.
-                if (!obj.VisibleExpression.Contains("TotalPages") || FinalPass)
+                if (!obj.VisibleExpression.Contains("TotalPages") || (Report.DoublePass && FinalPass))
                 {
                     expression = Report.Calc(Code.CodeUtils.FixExpressionWithBrackets(obj.VisibleExpression));
                 }

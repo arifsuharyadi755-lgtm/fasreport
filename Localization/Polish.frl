@@ -93,6 +93,7 @@
     </Shapes>
     <PictureObject Text="Obrazek"/>
     <TableObject Text="Tabela"/>
+    <Matrix Text="Matryca"/>
     <MatrixObject Text="Matryca"/>
     <SubreportObject Text="Podreport"/>
     <BarcodeObject Text="Kod kreskowy"/>
@@ -129,7 +130,7 @@
     <MdbFile Text="Baza danych MS Access (*.mdb)|*.mdb"/>
     <MdfFile Text="Bazy danych Microsoft SQL Server (*.mdf)|*.mdf"/>
     <RtfFile Text="Plik sformatowany (*.rtf)|*.rtf"/>
-    <Images Text="Pliki obrazów|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
+    <Images Text="Pliki obrazów|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf;*.webp"/>
     <Assembly Text="Assembly (*.dll,*.exe)|*.dll;*.exe"/>
     <PrnFile Text="Wydruk do pliku (*.prn)|*.prn"/>
     <BmpFile Text="Bitmapa (*.bmp)|*.bmp"/>
@@ -1007,7 +1008,7 @@
       <InsertToRight Text="Wstaw kolumnę po prawej"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Połącz komórki"/>
+      <Merge Text="Połącz komórki"/>
       <Split Text="Podziel komórki"/>
     </TableCell>
     <MatrixObject>

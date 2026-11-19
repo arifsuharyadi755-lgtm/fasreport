@@ -34,6 +34,7 @@ namespace FastReport
     /// Specifies where to print an object.
     /// </summary>
     [Flags]
+    [TypeConverter(typeof(FastReport.TypeConverters.FlagConverter))]
     public enum PrintOn
     {
         /// <summary>
@@ -112,6 +113,7 @@ namespace FastReport
         private string evenStyle;
         private string hoverStyle;
         private StylePriority evenStylePriority;
+        private bool pageBreak;
         private PrintOn printOn;
         private string beforePrintEvent;
         private string afterPrintEvent;
@@ -210,12 +212,12 @@ namespace FastReport
         /// </code>
         /// </example>          
         [Category("Appearance")]
-        [EditorAttribute("FastReport.TypeEditors.FillEditor, FastReport",typeof(UITypeEditor))]
+        [EditorAttribute("FastReport.TypeEditors.FillEditor, FastReport", typeof(UITypeEditor))]
         public virtual FillBase Fill
         {
             get
             {
-                return fill; 
+                return fill;
             }
             set
             {
@@ -277,6 +279,7 @@ namespace FastReport
         public Hyperlink Hyperlink
         {
             get { return hyperlink; }
+            set { hyperlink = value; }
         }
 
         /// <summary>
@@ -400,6 +403,18 @@ namespace FastReport
         {
             get { return evenStylePriority; }
             set { evenStylePriority = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets a value that determines whether to insert the hard page break before processing this object.
+        /// </summary>
+        [Browsable(false)]
+        [DefaultValue(false)]
+        [Category("Behavior")]
+        public bool PageBreak
+        {
+            get { return pageBreak; }
+            set { pageBreak = value; }
         }
 
         /// <summary>
@@ -586,6 +601,9 @@ namespace FastReport
             }
         }
 
+        [Browsable(false)]
+        protected internal virtual bool IsCompilationNeeded => false;
+
         /// <summary>
         /// Gets or sets an object's cursor shape.
         /// </summary>
@@ -676,6 +694,7 @@ namespace FastReport
             EvenStyle = src.EvenStyle;
             HoverStyle = src.HoverStyle;
             EvenStylePriority = src.EvenStylePriority;
+            PageBreak = src.PageBreak;
             PrintOn = src.PrintOn;
             BeforePrintEvent = src.BeforePrintEvent;
             AfterPrintEvent = src.AfterPrintEvent;
@@ -776,6 +795,26 @@ namespace FastReport
             return e.Graphics.IsVisible(objRect);
         }
 
+        /// <summary>
+        /// Validate this object.
+        /// </summary>
+        /// <returns>List of errors</returns>
+        public virtual List<ValidationError> Validate()
+        {
+            List<ValidationError> listError = new List<ValidationError>();
+
+            if (Height <= 0 || Width <= 0)
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,IncorrectSize"), this));
+
+            if (Name == "")
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,UnnamedObject"), this));
+
+            if (Parent is ReportComponentBase && !Validator.RectContainInOtherRect((Parent as ReportComponentBase).AbsBounds, this.AbsBounds))
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,OutOfBounds"), this));
+
+            return listError;
+        }
+
         /// <inheritdoc/>
         public override void Serialize(FRWriter writer)
         {
@@ -788,7 +827,7 @@ namespace FastReport
                 writer.WriteStr("ExportableExpression", ExportableExpression);
             Border.Serialize(writer, "Border", c.Border);
             //if(Fill != c.Fill)
-                Fill.Serialize(writer, "Fill", c.Fill);
+            Fill.Serialize(writer, "Fill", c.Fill);
             if (Cursor != c.Cursor && !Config.WebMode)
                 writer.WriteValue("Cursor", Cursor);
             Hyperlink.Serialize(writer, c.Hyperlink);
@@ -812,6 +851,8 @@ namespace FastReport
                     writer.WriteValue("EvenStylePriority", EvenStylePriority);
                 if (HoverStyle != c.HoverStyle)
                     writer.WriteStr("HoverStyle", HoverStyle);
+                if (PageBreak != c.PageBreak)
+                    writer.WriteBool("PageBreak", PageBreak);
                 if (PrintOn != c.PrintOn)
                     writer.WriteValue("PrintOn", PrintOn);
                 if (BeforePrintEvent != c.BeforePrintEvent)
@@ -873,6 +914,13 @@ namespace FastReport
         #endregion
 
         #region Report Engine
+        /// <summary>
+        /// Resets the data from the previous report run.
+        /// </summary>
+        public virtual void ResetData()
+        {
+        }
+
         /// <summary>
         /// Initializes the object before running a report.
         /// </summary>
@@ -984,7 +1032,12 @@ namespace FastReport
 
             if (!String.IsNullOrEmpty(ExportableExpression))
             {
-                expressions.Add(Code.CodeUtils.FixExpressionWithBrackets(ExportableExpression));
+                string expression = Code.CodeUtils.FixExpressionWithBrackets(ExportableExpression);
+                if (expression.ToLower() == "true" || expression.ToLower() == "false")
+                {
+                    expression = expression.ToLower();
+                }
+                expressions.Add(expression);
             }
 
             return expressions.ToArray();

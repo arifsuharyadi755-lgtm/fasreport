@@ -6,10 +6,37 @@ using System.Reflection;
 using System.Drawing;
 using FastReport.Data;
 using FastReport.Export;
+using System.Linq;
 
 namespace FastReport.Utils
 {
-    public partial class FunctionInfo
+    public abstract class BaseObjectInfo<T> where T : BaseObjectInfo<T>
+    {
+        /// <summary>
+        /// Tooltip text.
+        /// </summary>
+        public abstract string Text { get; set; }
+
+        /// <summary>
+        /// List of subitems.
+        /// </summary>
+        public List<T> Items { get; }
+
+        /// <summary>
+        /// Enumerates all objects.
+        /// </summary>
+        /// <param name="list">List that will contain enumerated items.</param>
+        public abstract void EnumItems(ICollection<T> list);
+
+        internal abstract T FindOrCreate(string complexName);
+
+        protected BaseObjectInfo()
+        {
+            Items = new List<T>();
+        }
+    }
+
+    public class FunctionInfo : BaseObjectInfo<FunctionInfo>
     {
         #region Fields
         private string text;
@@ -18,7 +45,7 @@ namespace FastReport.Utils
 #endif
         #endregion
 
-#region Properties
+        #region Properties
         /// <summary>
         /// Name of object or category.
         /// </summary>
@@ -42,7 +69,7 @@ namespace FastReport.Utils
         /// <summary>
         /// Tooltip text.
         /// </summary>
-        public string Text
+        public override string Text
         {
             get { return text; }
             set
@@ -66,21 +93,15 @@ namespace FastReport.Utils
             set;
         }
 
-        /// <summary>
-        /// List of subitems.
-        /// </summary>
-        public List<FunctionInfo> Items
-        {
-            get;
-        }
-#endregion
+        #endregion
 
-#region Public Methods
+        #region Public Methods
+
         /// <summary>
         /// Enumerates all objects.
         /// </summary>
         /// <param name="list">List that will contain enumerated items.</param>
-        public void EnumItems(ICollection<FunctionInfo> list)
+        public override void EnumItems(ICollection<FunctionInfo> list)
         {
             list.Add(this);
             foreach (FunctionInfo item in Items)
@@ -90,14 +111,14 @@ namespace FastReport.Utils
         }
 
 #if !CATEGORY_OPTIMIZATION
-        internal FunctionInfo FindOrCreate(string complexName)
+        internal override FunctionInfo FindOrCreate(string complexName)
         {
-            string[] itemNames = complexName.Split(new char[] { ',' });
+            string[] itemNames = complexName.Split(',');
             FunctionInfo root = this;
             foreach (string itemName in itemNames)
             {
                 FunctionInfo item = null;
-                foreach (FunctionInfo rootItem in root.Items)
+                foreach (var rootItem in root.Items)
                 {
                     if (rootItem.Name != "" && rootItem.Name == itemName)
                     {
@@ -141,36 +162,101 @@ namespace FastReport.Utils
             Text = text;
         }
 
-#endregion
+        internal FunctionInfo Find(string identifier)
+        {
+            var list = new List<FunctionInfo>();
+            RegisteredObjects.Functions.EnumItems(list);
+
+            foreach (FunctionInfo info in list)
+            {
+                if (info.Function != null && info.Text.Contains(identifier))
+                    return info;
+            }
+            return null;
+        }
+
+        #endregion
 
         internal FunctionInfo()
         {
-            Items = new List<FunctionInfo>();
             Name = "";
         }
 
         internal FunctionInfo(string name, MethodInfo func, string text) : this()
         {
-            this.Name = name;
+            Name = name;
             Update(func, text);
+        }
+    }
+
+    public class DataConnectionInfo : BaseObjectInfo<DataConnectionInfo>
+    {
+        private string text;
+
+        /// <summary>
+        /// The registered data connection. This type is subclass of <see cref="DataConnectionBase"/>
+        /// </summary>
+        public Type Object { get; set; }
+
+        /// <summary>
+        /// Tooltip text.
+        /// </summary>
+        public override string Text
+        {
+            get { return text; }
+            set
+            {
+                text = value;
+                if (text == "")
+                {
+                    if (Object != null)
+                        text = "Objects," + Object.Name;
+                }
+            }
+        }
+
+        public override void EnumItems(ICollection<DataConnectionInfo> list)
+        {
+            list.Add(this);
+            foreach (var item in Items)
+            {
+                item.EnumItems(list);
+            }
+        }
+
+        internal void Update(Type obj, string text)
+        {
+            Object = obj;
+            Text = text;
+        }
+
+        internal override DataConnectionInfo FindOrCreate(string complexName)
+        {
+            DataConnectionInfo root = this;
+            var item = new DataConnectionInfo();
+            item.Text = complexName;
+            root.Items.Add(item);
+            return item;
+        }
+
+        public DataConnectionInfo()
+        {
         }
     }
 
     /// <summary>
     /// Holds the information about the registered object.
     /// </summary>
-    public partial class ObjectInfo
+    public partial class ObjectInfo : BaseObjectInfo<ObjectInfo>
     {
-#region Fields
+        #region Fields
         private string name;
-        private Object fObject;
+        private Type fObject;
         private string text;
-        private int flags;
-        private bool multiInsert;
         private bool enabled;
-#endregion
+        #endregion
 
-#region Properties
+        #region Properties
         /// <summary>
         /// Name of object or category.
         /// </summary>
@@ -185,24 +271,24 @@ namespace FastReport.Utils
         /// </summary>
         public Type Object
         {
-            get { return fObject as Type; }
+            get { return fObject; }
             set { fObject = value; }
         }
 
         /// <summary>
         /// The registered function.
         /// </summary>
-        [Obsolete("Use RegisteredObjects.Functions")]
+        [Obsolete("Use RegisteredObjects.Functions", true)]
         public MethodInfo Function
         {
-            get { return fObject as MethodInfo; }
-            set { fObject = value; }
+            get { return null; }
+            set { }
         }
 
         /// <summary>
         /// Tooltip text.
         /// </summary>
-        public string Text
+        public override string Text
         {
             get { return text; }
             set
@@ -217,27 +303,6 @@ namespace FastReport.Utils
         }
 
         /// <summary>
-        /// Flags that will be used to create an object instance in the designer.
-        /// </summary>
-        public int Flags
-        {
-            get { return flags; }
-            set { flags = value; }
-        }
-
-        /// <summary>
-        /// Indicates whether this object can be inserted several times simultaneously.
-        /// </summary>
-        /// <remarks>
-        /// This is applied to Line object only.
-        /// </remarks>
-        public bool MultiInsert
-        {
-            get { return multiInsert; }
-            set { multiInsert = value; }
-        }
-
-        /// <summary>
         /// Gets or sets the enabled flag for the object.
         /// </summary>
         public bool Enabled
@@ -246,32 +311,25 @@ namespace FastReport.Utils
             set { enabled = value; }
         }
 
-        /// <summary>
-        /// List of subitems.
-        /// </summary>
-        public List<ObjectInfo> Items
-        {
-            get;
-        }
-#endregion
+        #endregion
 
-#region Public Methods
+        #region Public Methods
         /// <summary>
         /// Enumerates all objects.
         /// </summary>
         /// <param name="list">List that will contain enumerated items.</param>
-        public void EnumItems(ICollection<ObjectInfo> list)
+        public override void EnumItems(ICollection<ObjectInfo> list)
         {
             list.Add(this);
-            foreach (ObjectInfo item in Items)
+            foreach (var item in Items)
             {
                 item.EnumItems(list);
             }
         }
 
-        internal ObjectInfo FindOrCreate(string complexName)
+        internal override ObjectInfo FindOrCreate(string complexName)
         {
-            string[] itemNames = complexName.Split(new char[] { ',' });
+            string[] itemNames = complexName.Split(',');
             ObjectInfo root = this;
             foreach (string itemName in itemNames)
             {
@@ -296,35 +354,163 @@ namespace FastReport.Utils
             return root;
         }
 
-        internal void Update(Object obj, Bitmap image, int imageIndex, string text, int flags, bool multiInsert)
+        /// <summary>
+        /// Remove an object from the collection by its category and object name.
+        /// </summary>
+        /// <param name="complexName">A comma-separated string with the category and object name to be removed.</param>
+        internal void Remove(string complexName)
+        {
+            string[] itemNames = complexName.Split(',');
+            ObjectInfo root = this;
+            foreach (string itemName in itemNames)
+            {
+                ObjectInfo item = null;
+                for (int i = 0; i < root.Items.Count; i++)
+                {
+                    var rootItem = root.Items[i];
+
+                    if (rootItem.Name != "" && rootItem.Name == itemName)
+                    {
+                        item = rootItem;
+                        break;
+                    }
+                    if (rootItem.Text.Contains(itemName))
+                    {
+                        root.Items.RemoveAt(i);
+                        break;
+                    }
+                }
+                root = item;
+            }
+        }
+
+        /// <summary>
+        /// Remove an object or category from the collection by its name and path.
+        /// If a category is specified, all nested objects within that category are removed.
+        /// </summary>
+        /// <param name="objPath">The path to the category (or categories) to remove, in a comma-separated format.</param>
+        /// <param name="objName">The name of the object or category to remove.</param>
+        /// <param name="flags">Flags to distinguish objects with the same name (optional).</param>
+        /// <returns>A list of the removed objects. This list will contain all objects that were deleted, including those from nested categories.</returns>
+        internal List<ObjectInfo> Remove(string objName, string objPath, int flags = 0)
+        {
+            string[] itemNames = objPath.Split(',');
+
+            ObjectInfo root = this;
+
+            // search for the location of an object or category
+            foreach (string itemName in itemNames)
+            {
+                ObjectInfo item = null;
+
+                for (int i = 0; i < root.Items.Count; i++)
+                {
+                    var rootItem = root.Items[i];
+
+                    if (rootItem.Name == itemName)
+                    {
+                        item = rootItem;
+                        break;
+                    }
+                }
+                root = item;
+            }
+
+            // list of deleted objects from FObjects to remove them from FTypes later
+            var deletedItems = new List<ObjectInfo>();
+
+            for (int i = 0; i < root?.Items.Count; i++)
+            {
+                var rootItem = root.Items[i];
+
+                // if the item is a category and matches the name, remove it and all its contents
+                if (rootItem.Name == objName && rootItem.Items.Count > 0)
+                {
+                    CollectAllItems(rootItem, deletedItems); // collect all items within the category
+                    root.Items.RemoveAt(i); // remove the category
+                    break;
+                }
+
+                // check if the object has a "Flags" property
+                var flagsProperty = rootItem.GetType().GetProperty("Flags");
+
+                bool flagsMatch = true; // by default, flags match (used when flag comparison is not required)
+
+                if (flagsProperty != null)
+                {
+                    // if the property exists, get its value
+                    var flagsValue = flagsProperty.GetValue(rootItem);
+
+                    // check if the value of the property is an integer
+                    if (flagsValue is int flagsInt)
+                    {
+                        // if the passed flag is 0, the flag check is ignored
+                        // otherwise, check if the value of "Flags" matches the passed flag
+                        flagsMatch = flags == 0 || flagsInt == flags;
+                    }
+                }
+
+                // if the element is an object (or an empty category) and matches the name (and flags, if specified), remove it
+                if (!string.IsNullOrEmpty(rootItem.Text) && rootItem.Text.Contains(objName) && flagsMatch)
+                {
+                    // if the current item is an object (and not a category), add it to deletedItems
+                    if (rootItem.Object != null)
+                        deletedItems.Add(rootItem);
+                    root.Items.RemoveAt(i); // remove the object
+                    break;
+                }
+            }
+            return deletedItems;
+        }
+
+        /// <summary>
+        /// Recursively collect all nested objects from the specified parent object and adds them to the provided list.
+        /// </summary>
+        /// <param name="parent">The parent object to collect items from.</param>
+        /// <param name="items">The list to store collected objects.</param>
+        private static void CollectAllItems(ObjectInfo parent, List<ObjectInfo> items)
+        {
+            foreach (var item in parent.Items)
+            {
+                items.Add(item);
+                if (item.Items.Count > 0) // recursively collect nested items
+                {
+                    CollectAllItems(item, items);
+                }
+            }
+        }
+
+        internal void Update(Type obj, Bitmap image, int imageIndex, string text)
         {
             fObject = obj;
             UpdateDesign(image, imageIndex);
             Text = text;
-            Flags = flags;
-            MultiInsert = multiInsert;
         }
 
-        internal void Update(Object obj, Bitmap image, int imageIndex, int buttonIndex, string text, int flags,
+        internal void Update(Type obj, Bitmap image, int imageIndex, string text, int flags, bool multiInsert)
+        {
+            fObject = obj;
+            UpdateDesign(flags, multiInsert, image, imageIndex);
+            Text = text;
+        }
+
+        internal void Update(Type obj, Bitmap image, int imageIndex, int buttonIndex, string text, int flags,
             bool multiInsert)
         {
             fObject = obj;
-            UpdateDesign(image, imageIndex, buttonIndex);
+            UpdateDesign(flags, multiInsert, image, imageIndex, buttonIndex);
             Text = text;
-            Flags = flags;
-            MultiInsert = multiInsert;
         }
 
-#endregion
+        #endregion
 
         internal ObjectInfo()
         {
-            Items = new List<ObjectInfo>();
             name = "";
             enabled = true;
         }
 
-        internal ObjectInfo(string name, Object obj, Bitmap image, int imageIndex, string text,
+        internal ObjectInfo(string name, Type obj, Bitmap image, int imageIndex, string text,
           int flags, bool multiInsert) : this()
         {
             this.name = name;
@@ -351,20 +537,33 @@ namespace FastReport.Utils
     /// </example>
     public static partial class RegisteredObjects
     {
-#region Fields
-        private static Hashtable FTypes = new Hashtable();
-        private static ObjectInfo FObjects = new ObjectInfo();
-        private static Dictionary<Type, Dictionary<string, Delegate>> methodsDictionary
+        #region Fields
+        private static readonly Hashtable FTypes = new Hashtable();
+        private static readonly ObjectInfo FObjects = new ObjectInfo();
+        private static readonly Dictionary<Type, Dictionary<string, Delegate>> methodsDictionary
             = new Dictionary<Type, Dictionary<string, Delegate>>();
-#endregion
+        #endregion
 
-#region Properties
+        #region Properties
         /// <summary>
         /// Root object for all registered objects.
         /// </summary>
         public static ObjectInfo Objects
         {
             get { return FObjects; }
+        }
+
+        /// <summary>
+        /// Root object for all registered exports.
+        /// </summary>
+        public static ObjectInfo Exports { get; }
+
+        /// <summary>
+        /// Root object for all registered DataConnections
+        /// </summary>
+        public static DataConnectionInfo DataConnections
+        {
+            get;
         }
 
         /// <summary>
@@ -380,31 +579,81 @@ namespace FastReport.Utils
             get;
         }
 
-#endregion
+        #endregion
 
-#region Private Methods
+        #region Private Methods
 
         private static void RegisterType(Type type)
         {
             FTypes[type.Name] = type;
         }
 
-        private static void InternalAdd(Object obj, string category, Bitmap image, int imageIndex, string text, int flags,
-            bool multiInsert)
+        /// <summary>
+        /// Recursively check if the specified type exists within the collection of objects.
+        /// </summary>
+        /// <param name="items">The collection of objects to search through.</param>
+        /// <param name="type">The name of the type to find.</param>
+        /// <returns>
+        /// Return <c>true</c> if the specified type is found; otherwise, <c>false</c>.
+        /// </returns>
+        private static bool ContainsTypeRecursive(IEnumerable<ObjectInfo> items, string type)
+        {
+            foreach (var item in items)
+            {
+                if (item.Object?.Name == type)
+                    return true;
+
+                // recursive search in nested items
+                if (item.Items.Count > 0 && ContainsTypeRecursive(item.Items, type))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Remove the specified type from the collection of registered types 
+        /// if it does not exist in the hierarchy of objects.
+        /// </summary>
+        /// <param name="type">The name of the type to remove.</param>
+        private static void RemoveRegisteredType(string type)
+        {
+            // check for the existence of the type in FObjects
+            bool objectExistsInFObjects = ContainsTypeRecursive(FObjects.Items, type);
+
+            // remove the type from FTypes if it does not exist in FObjects
+            if (!objectExistsInFObjects)
+            {
+                FTypes.Remove(type);
+            }
+        }
+
+        private static ObjectInfo InternalAdd(Type obj, string category, Bitmap image, int imageIndex, string text)
+        {
+            ObjectInfo item = FObjects.FindOrCreate(category);
+            item.Update(obj, image, imageIndex, text);
+            if (obj != null)
+                RegisterType(obj);
+            return item;
+        }
+
+        private static ObjectInfo InternalAdd(Type obj, string category, Bitmap image, int imageIndex, string text,
+            int flags, bool multiInsert)
         {
             ObjectInfo item = FObjects.FindOrCreate(category);
             item.Update(obj, image, imageIndex, text, flags, multiInsert);
-            if (obj is Type)
-                RegisterType(obj as Type);
+            if (obj != null)
+                RegisterType(obj);
+            return item;
         }
 
-        private static void InternalAdd(Object obj, string category, Bitmap image, int imageIndex, int buttonIndex,
+        private static ObjectInfo InternalAdd(Type obj, string category, Bitmap image, int imageIndex, int buttonIndex,
             string text, int flags, bool multiInsert)
         {
             ObjectInfo item = FObjects.FindOrCreate(category);
             item.Update(obj, image, imageIndex, buttonIndex, text, flags, multiInsert);
-            if (obj is Type)
-                RegisterType(obj as Type);
+            if (obj != null)
+                RegisterType(obj);
+            return item;
         }
 
 #if CATEGORY_OPTIMIZATION
@@ -421,9 +670,9 @@ namespace FastReport.Utils
         }
 #endif
 
-#endregion
+        #endregion
 
-#region Public Methods
+        #region Public Methods
         /// <summary>
         /// Checks whether the specified type is registered already.
         /// </summary>
@@ -442,17 +691,17 @@ namespace FastReport.Utils
 
         internal static void AddReport(Type obj, int imageIndex)
         {
-            InternalAdd(obj, "", null, imageIndex, "", 0, false);
+            InternalAdd(obj, "", null, imageIndex, "");
         }
 
         internal static void AddPage(Type obj, string category, int imageIndex)
         {
-            InternalAdd(obj, category, null, imageIndex, "", 0, false);
+            InternalAdd(obj, category, null, imageIndex, "");
         }
 
         internal static void AddCategory(string category, int imageIndex, string text)
         {
-            InternalAdd(null, category, null, imageIndex, text, 0, false);
+            InternalAdd(null, category, null, imageIndex, text);
         }
 
         internal static void AddCategory(string category, int imageIndex, int buttonIndex, string text)
@@ -481,48 +730,31 @@ namespace FastReport.Utils
         /// </remarks>
         public static void AddCategory(string name, Bitmap image, string text)
         {
-            InternalAdd(null, name, image, -1, text, 0, false);
+            InternalAdd(null, name, image, -1, text);
         }
 
         /// <summary>
-        /// Register Export category.
+        /// Obsolete. Use <see cref="ExportsOptions"/> api instead.
         /// </summary>
-        /// <param name="name">Category name.</param>
-        /// <param name="text">Category text.</param>
+        [Obsolete]
         public static void AddExportCategory(string name, string text, int imageIndex = -1)
         {
-            InternalAdd(null, "ExportGroups," + name, null, imageIndex, text, 0, false);
+            PrivateAddExport(null, "ExportGroups," + name, text, null, imageIndex);
         }
 
         /// <summary>
-        /// Registers a new export filter.
+        /// Obsolete. Use <see cref="ExportsOptions"/> api instead.
         /// </summary>
-        /// <param name="obj">Type of export filter.</param>
-        /// <param name="text">Text for export filter's menu item.</param>
-        /// <remarks>
-        /// The <b>obj</b> must be of <see cref="ExportBase"/> type.
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// // register own export filter
-        /// RegisteredObjects.AddExport(typeof(MyExport), "My Export");
-        /// </code>
-        /// </example>
+        [Obsolete]
         public static void AddExport(Type obj, string text)
         {
             AddExport(obj, "", text);
         }
 
-        internal static void AddExport(Type obj, string text, int imageIndex)
-        {
-            InternalAdd(obj, "", null, imageIndex, text, 0, false);
-        }
-
-        internal static void AddExport(Type obj, string category, string text, int imageIndex)
-        {
-            InternalAdd(obj, "ExportGroups," + category + ",", null, imageIndex, text, 0, false);
-        }
-
+        /// <summary>
+        /// Obsolete. Use <see cref="ExportsOptions"/> api instead.
+        /// </summary>
+        [Obsolete]
         public static void AddExport(Type obj, string category, string text, Bitmap image = null)
         {
             if (!obj.IsSubclassOf(typeof(ExportBase)))
@@ -531,11 +763,24 @@ namespace FastReport.Utils
             InternalAddExport(obj, category, text, image);
         }
 
-        internal static void InternalAddExport(Type obj, string category, string text, Bitmap image = null)
+        internal static ObjectInfo AddExport(Type obj, string text, int imageIndex)
         {
-            InternalAdd(obj, "ExportGroups," + category + ",", image, -1, text, 0, false);
+            return PrivateAddExport(obj, "", text, null, imageIndex);
         }
 
+        internal static void InternalAddExport(Type obj, string category, string text, Bitmap image = null)
+        {
+            PrivateAddExport(obj, "ExportGroups," + category + ",", text, image);
+        }
+
+        private static ObjectInfo PrivateAddExport(Type obj, string category, string text, Bitmap image = null, int imageIndex = -1)
+        {
+            var item = Exports.FindOrCreate(category);
+            item.Update(obj, image, imageIndex, text);
+            if (obj != null)
+                RegisterType(obj);
+            return item;
+        }
 
         /// <summary>
         /// Registers custom data connection.
@@ -563,7 +808,14 @@ namespace FastReport.Utils
         internal static void InternalAddConnection(Type obj, string text = "")
         {
             if (!IsTypeRegistered(obj))
-                Add(obj, "", 0, text);
+                PrivateAddConnection(obj, text);
+        }
+
+        private static void PrivateAddConnection(Type obj, string text)
+        {
+            DataConnectionInfo item = DataConnections.FindOrCreate("");
+            item.Update(obj, text);
+            RegisterType(obj);
         }
 
         /// <summary>
@@ -669,14 +921,12 @@ namespace FastReport.Utils
         /// </example>
         public static void AddFunctionCategory(string category, string text)
         {
-            InternalAdd(null, "Functions," + category, null, 66, text, 0, false);
             PrivateAddFunction(null, "Functions," + category, text);
         }
 
 #if CATEGORY_OPTIMIZATION
         public static void AddFunctionCategory(string name, FunctionInfo category)
         {
-            InternalAdd(null, "Functions," + category, null, 66, name, 0, false);
             PrivateAddFunction(null, category, 66, name);
         }
 #endif
@@ -781,9 +1031,32 @@ namespace FastReport.Utils
 
         internal static void InternalAddFunction(MethodInfo function, string category)
         {
-            InternalAdd(function, "Functions," + category + ",", null, 52, "", 0, false);
-            // new 
             PrivateAddFunction(function, "Functions," + category + ",");
+        }
+
+        /// <summary>
+        /// Remove an object from the collection of objects based on its type and category.
+        /// </summary>
+        /// <param name="obj">The type of the object to be removed.</param>
+        /// <param name="category">The category associated with the object type for removal.</param>
+        public static void Remove(Type obj, string category)
+        {
+            FObjects.Remove(category + "," + obj.Name);
+            if (obj != null)
+                RemoveRegisteredType(obj.Name);
+        }
+
+        /// <summary>
+        /// Remove an object or a category from the collection of objects based on its name and path.
+        /// </summary>
+        /// <param name="objectName">The name of the object or category to be removed.</param>
+        /// <param name="objectPath">The path to the object or category.</param>
+        /// <param name="flags">Flags used to identify the specific object to be removed, if multiple objects have the same name.</param>
+        public static void Remove(string objectName, string objectPath, int flags = 0)
+        {
+            var deletedItems = FObjects.Remove(objectName, objectPath, flags);
+            foreach (var item in deletedItems)
+                RemoveRegisteredType(item.Object?.Name);
         }
 
         internal static Type FindType(string typeName)
@@ -810,12 +1083,40 @@ namespace FastReport.Utils
 
             List<ObjectInfo> list = new List<ObjectInfo>();
             FObjects.EnumItems(list);
-
             foreach (ObjectInfo item in list)
             {
                 if (item.Object == type)
                     return item;
             }
+
+            var export = FindExport(type);
+            return export;
+        }
+
+        public static ObjectInfo FindExport(Type type)
+        {
+            var exports = new List<ObjectInfo>();
+            Exports.EnumItems(exports);
+            foreach (ObjectInfo item in exports)
+            {
+                if (item.Object == type)
+                    return item;
+            }
+
+            return null;
+        }
+
+        public static DataConnectionInfo FindConnection(Type type)
+        {
+            if (type == null)
+                return null;
+
+            var dataConnections = new List<DataConnectionInfo>();
+            DataConnections.EnumItems(dataConnections);
+            foreach (var item in dataConnections)
+                if (item.Object == type)
+                    return item;
+
             return null;
         }
 
@@ -866,7 +1167,7 @@ namespace FastReport.Utils
                     return result;
             }
             if (inheritance)
-                return RegisteredObjects.GetMethod(type.BaseType, methodName, inheritance);
+                return GetMethod(type.BaseType, methodName, inheritance);
             return null;
         }
 
@@ -934,8 +1235,7 @@ namespace FastReport.Utils
                 .Replace("<", "&lt;").Replace(">", "&gt;").Replace("\t", "<br/>").ToString();
         }
 
-
-#endregion
+        #endregion
 
         static RegisteredObjects()
         {
@@ -944,6 +1244,8 @@ namespace FastReport.Utils
             Assemblies.Add(Assembly.GetExecutingAssembly());
 
             Functions = new FunctionInfo();
+            DataConnections = new DataConnectionInfo();
+            Exports = new ObjectInfo();
         }
     }
 

@@ -1,10 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Drawing;
-using System.ComponentModel;
 using FastReport.Utils;
-using System.Drawing.Drawing2D;
+using System;
+using System.ComponentModel;
+using System.Drawing;
+using System.Text;
 
 namespace FastReport.Barcode
 {
@@ -38,8 +36,6 @@ namespace FastReport.Barcode
         private bool trim;
         internal RectangleF drawArea;
         internal RectangleF barArea;
-        internal static Font FFont = new Font("Arial", 8);
-        internal static Font FSmallFont = new Font("Arial", 6);
         internal bool textUp;
         internal float ratioMin;
         internal float ratioMax;
@@ -99,13 +95,13 @@ namespace FastReport.Barcode
             set { trim = value; }
         }
 
-        private string Code
+        internal string Code
         {
             get
             {
                 MakeModules();
                 pattern = GetPattern();
-                if(pattern == null)
+                if (pattern == null)
                 {
                     MyRes res = new MyRes("Messages");
                     throw new FormatException(res.Get("BarcodeManyError"));
@@ -133,7 +129,7 @@ namespace FastReport.Barcode
             modules[3] = modules[1] * 2;
         }
 
-        private void DoLines(string data, IGraphics g, float zoom)
+        internal virtual void DoLines(string data, IGraphics g, float zoom)
         {
             using (Pen pen = new Pen(Color))
             {
@@ -196,7 +192,7 @@ namespace FastReport.Barcode
             }
         }
 
-        private string CheckSumModulo10(string data)
+        internal string CheckSumModulo10(string data)
         {
             int sum = 0;
             int fak = data.Length;
@@ -296,6 +292,8 @@ namespace FastReport.Barcode
         #endregion
 
         #region Protected Methods
+        internal float FontHeight => Font.Height * DrawUtils.ScreenDpiFX * 14 / 13; // 14/13 to be more or less compatible with old behavior (Arial,8 with hardcoded 14px height)
+
         internal int CharToInt(char c)
         {
             return int.Parse(Convert.ToString(c));
@@ -358,7 +356,7 @@ namespace FastReport.Barcode
             return builder.ToString();
         }
 
-        internal float GetWidth(string code)
+        internal virtual float GetWidth(string code)
         {
             float result = 0;
             float w;
@@ -405,7 +403,7 @@ namespace FastReport.Barcode
 
         internal override void Initialize(string text, bool showText, int angle, float zoom)
         {
-            if(trim)
+            if (trim)
                 text = text.Trim();
             base.Initialize(text, showText, angle, zoom);
         }
@@ -424,7 +422,7 @@ namespace FastReport.Barcode
                     bmp.SetResolution(96, 96);
                     using (Graphics g = Graphics.FromImage(bmp))
                     {
-                        txtWidth = g.MeasureString(text, FFont, 100000).Width;
+                        txtWidth = g.MeasureString(text, Font, 100000).Width;
                     }
                 }
 
@@ -446,6 +444,7 @@ namespace FastReport.Barcode
             return new SizeF(drawArea.Width * 1.25f, 0);
         }
 
+        /// <inheritdoc/>
         public override void DrawBarcode(IGraphics g, RectangleF displayRect)
         {
             float originalWidth = CalcBounds().Width / 1.25f;
@@ -455,9 +454,9 @@ namespace FastReport.Barcode
             barArea.Height = height / zoom;
             if (showText)
             {
-                barArea.Height -= 14;
+                barArea.Height -= FontHeight;
                 if (textUp)
-                    barArea.Y = 14;
+                    barArea.Y = FontHeight;
             }
             drawArea.Height = height / zoom;
 
@@ -484,6 +483,7 @@ namespace FastReport.Barcode
                 DoLines(pattern, g, zoom);
                 if (showText)
                     DrawText(g, text);
+
             }
             finally
             {
@@ -503,17 +503,19 @@ namespace FastReport.Barcode
 
             // when we print, .Net automatically scales the font. However, we need to handle this process.
             // Downscale the font to the screen resolution, then scale by required value (Zoom).
-            float fontZoom = 14f / (int)g.MeasureString(s, FFont).Height * zoom;
-            Font font = small ? FSmallFont : FFont;
-            using (Font drawFont = new Font(font.FontFamily, font.Size * fontZoom, font.Style))
+            float fontZoom = FontHeight / (int)g.MeasureString(s, Font).Height * zoom;
+            using (var drawFont = new Font(Font.FontFamily, (Font.Size - (small ? 2 : 0)) * fontZoom, Font.Style))
             {
                 SizeF size = g.MeasureString(s, drawFont);
                 size.Width /= zoom;
                 size.Height /= zoom;
-                
-                g.DrawString(s, drawFont, new SolidBrush(Color),
-                  (x1 + (x2 - x1 - size.Width) / 2) * zoom,
-                  (textUp ? 0 : drawArea.Height - size.Height) * zoom);
+
+                using (var brush = new SolidBrush(Color))
+                {
+                    g.DrawString(s, drawFont, brush,
+                      (x1 + (x2 - x1 - size.Width) / 2) * zoom,
+                      (textUp ? 0 : drawArea.Height - size.Height) * zoom);
+                }
             }
         }
 

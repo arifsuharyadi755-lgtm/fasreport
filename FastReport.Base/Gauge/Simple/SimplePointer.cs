@@ -8,6 +8,9 @@ namespace FastReport.Gauge.Simple
     /// <summary>
     /// Represents a simple pointer.
     /// </summary>
+#if !DEBUG
+    [DesignTimeVisible(false)]
+#endif
     public class SimplePointer : GaugePointer
     {
         #region Fields
@@ -27,6 +30,7 @@ namespace FastReport.Gauge.Simple
         /// Gets o sets the Left offset of gauge pointer.
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         internal float Left
         {
             get { return left; }
@@ -37,6 +41,7 @@ namespace FastReport.Gauge.Simple
         /// Gets o sets the Top offset of gauge pointer.
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         internal float Top
         {
             get { return top; }
@@ -47,6 +52,7 @@ namespace FastReport.Gauge.Simple
         /// Gets o sets the height of gauge pointer.
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public float Height
         {
             get { return height; }
@@ -57,6 +63,7 @@ namespace FastReport.Gauge.Simple
         /// Gets or sets the width of a pointer.
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public float Width
         {
             get { return width; }
@@ -67,6 +74,7 @@ namespace FastReport.Gauge.Simple
         /// Gets or sets the pointer ratio.
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public float PointerRatio
         {
             get { return ptrRatio; }
@@ -77,6 +85,7 @@ namespace FastReport.Gauge.Simple
         /// Gets or sets the pointer horizontal offset (cm).
         /// </summary>
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public float HorizontalOffset
         {
             get { return horizontalOffset; }
@@ -113,8 +122,7 @@ namespace FastReport.Gauge.Simple
             width = (float)((Parent.Width - Parent.Border.Width - horizontalOffset * 2) * (Parent.Value - Parent.Minimum) / (Parent.Maximum - Parent.Minimum) * e.ScaleX);
 
             Brush brush = Fill.CreateBrush(new RectangleF(left, top, width, height), e.ScaleX, e.ScaleY);
-            g.FillRectangle(brush, left, top, width, height);
-            g.DrawRectangle(pen, left, top, width, height);
+            g.FillAndDrawRectangle(pen, brush, left, top, width, height);
         }
 
         internal virtual void DrawVert(FRPaintEventArgs e)
@@ -123,13 +131,12 @@ namespace FastReport.Gauge.Simple
             Pen pen = e.Cache.GetPen(BorderColor, BorderWidth * e.ScaleY, DashStyle.Solid);
 
             width = ((Parent.Width - Parent.Border.Width) * ptrRatio) * e.ScaleX;
-            height = (float)((Parent.Height - Parent.Border.Width -  horizontalOffset * 2) * (Parent.Value - Parent.Minimum) / (Parent.Maximum - Parent.Minimum) * e.ScaleY);
+            height = (float)((Parent.Height - Parent.Border.Width - horizontalOffset * 2) * (Parent.Value - Parent.Minimum) / (Parent.Maximum - Parent.Minimum) * e.ScaleY);
             left = (Parent.AbsLeft + Parent.Border.Width / 2 + (Parent.Width - Parent.Border.Width) / 2 - (Parent.Width - Parent.Border.Width) * ptrRatio / 2) * e.ScaleX;
             top = (Parent.AbsTop + Parent.Border.Width / 2 + Parent.Height - Parent.Border.Width - horizontalOffset) * e.ScaleY - height;
 
             Brush brush = Fill.CreateBrush(new RectangleF(left, top, width, height), e.ScaleX, e.ScaleY);
-            g.FillRectangle(brush, left, top, width, height);
-            g.DrawRectangle(pen, left, top, width, height);
+            g.FillAndDrawRectangle(pen, brush, left, top, width, height);
         }
 
         #endregion // Internal Methods

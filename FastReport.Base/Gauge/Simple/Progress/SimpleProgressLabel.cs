@@ -7,13 +7,17 @@ using System.Drawing;
 namespace FastReport.Gauge.Simple.Progress
 {
     /// <inheritdoc />
+#if !DEBUG
+    [DesignTimeVisible(false)]
+#endif
     public class SimpleProgressLabel : GaugeLabel
-    { 
+    {
         private int decimals;
 
         /// <summary>
         /// Gets or sets the number of fractional digits
         /// </summary>
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public int Decimals
         {
             get { return decimals; }
@@ -30,6 +34,7 @@ namespace FastReport.Gauge.Simple.Progress
 
         /// <inheritdoc />
         [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public override string Text
         {
             get { return base.Text; }
@@ -52,7 +57,7 @@ namespace FastReport.Gauge.Simple.Progress
             float dx = (Parent.Width - Parent.Border.Width) * e.ScaleX;
             float dy = (Parent.Height - Parent.Border.Width) * e.ScaleY;
 
-            PointF lblPt = new PointF(x + dx / 2, y + dy/2);
+            PointF lblPt = new PointF(x + dx / 2, y + dy / 2);
             SizeF txtSize = RadialUtils.GetStringSize(e, Parent, Font, Text);
             Font font = RadialUtils.GetFont(e, Parent, Font);
             Brush brush = e.Cache.GetBrush(Color);

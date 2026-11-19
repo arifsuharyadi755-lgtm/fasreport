@@ -66,7 +66,7 @@ namespace FastReport
         Bottom_Right,
     }
 
- 
+
 
     /// <summary>
     /// the base class for all picture objects
@@ -92,6 +92,7 @@ namespace FastReport
         private bool showErrorImage;
         private PictureBoxSizeMode sizeModeInternal;
         private ImageAlign imageAlign;
+        private ShapeKind shape;
 
         #endregion Private Fields
 
@@ -157,12 +158,7 @@ namespace FastReport
             get { return imageLocation; }
             set
             {
-                if (!String.IsNullOrEmpty(Config.ReportSettings.ImageLocationRoot))
-                    imageLocation = value.Replace(Config.ReportSettings.ImageLocationRoot, "");
-                else
-                    imageLocation = value;
-                LoadImage();
-                ResetImageIndex();
+                SetImageLocation(value, true); // or IsDesigning
             }
         }
 
@@ -333,6 +329,17 @@ namespace FastReport
             set { imageAlign = value; }
         }
 
+        /// <summary>
+        /// Gets or sets a shape kind.
+        /// </summary>
+        [DefaultValue(ShapeKind.Rectangle)]
+        [Category("Appearance")]
+        public ShapeKind Shape
+        {
+            get { return shape; }
+            set { shape = value; }
+        }
+
 
         #endregion Public Properties
 
@@ -358,6 +365,7 @@ namespace FastReport
         public PictureObjectBase()
         {
             sizeModeInternal = PictureBoxSizeMode.Zoom;
+            shape = ShapeKind.Rectangle;
             padding = new Padding();
             imageLocation = "";
             dataColumn = "";
@@ -376,7 +384,7 @@ namespace FastReport
             PictureObjectBase src = source as PictureObjectBase;
             if (src != null)
             {
-                ImageLocation = src.ImageLocation;
+                imageLocation = src.ImageLocation;
                 DataColumn = src.DataColumn;
                 ImageSourceExpression = src.ImageSourceExpression;
                 Padding = src.Padding;
@@ -387,6 +395,7 @@ namespace FastReport
                 Grayscale = src.Grayscale;
                 ShowErrorImage = src.ShowErrorImage;
                 ImageAlign = src.ImageAlign;
+                Shape = src.Shape;
             }
         }
 
@@ -616,7 +625,7 @@ namespace FastReport
             PointF lowerRight = new PointF(upperRight.X + lowerLeft.X - upperLeft.X,
                 upperRight.Y + lowerLeft.Y - upperLeft.Y);
             float top = Math.Min(Math.Min(upperLeft.Y, Math.Min(upperRight.Y, lowerLeft.Y)), lowerRight.Y);
-            float botom = Math.Max( Math.Max(upperLeft.Y, Math.Max(upperRight.Y, lowerLeft.Y)), lowerRight.Y);
+            float botom = Math.Max(Math.Max(upperLeft.Y, Math.Max(upperRight.Y, lowerLeft.Y)), lowerRight.Y);
             float height = botom - top;
             float offsetY = drawRect.Y - top;
 
@@ -667,8 +676,6 @@ namespace FastReport
             upperRight.Y += offsetY;
             lowerLeft.Y += offsetY;
         }
-
-        
 
         /// <summary>
         /// Loads image
@@ -776,6 +783,8 @@ namespace FastReport
                 writer.WriteBool("ShowErrorImage", ShowErrorImage);
             if (ImageAlign != ImageAlign.None)
                 writer.WriteValue("ImageAlign", ImageAlign);
+            if (Shape != c.Shape)
+                writer.WriteValue("Shape", Shape);
         }
 
         #endregion Public Methods
@@ -786,7 +795,6 @@ namespace FastReport
         /// </summary>
         /// <param name="e"></param>
         /// <param name="drawRect"></param>
-        /// <param name="image"></param>
         internal virtual void DrawImageInternal(FRPaintEventArgs e, RectangleF drawRect)
         {
             bool rotate = Angle == 90 || Angle == 270;
@@ -820,7 +828,7 @@ namespace FastReport
             {
                 if (ImageWidth == 0 || ImageHeight == 0)
                 {
-                    if (IsRunning)
+                    if (IsRunning && !IsPrinting)
                     {
                         Width = 0;
                         Height = 0;
@@ -884,6 +892,23 @@ namespace FastReport
             }
 
             return expressions.ToArray();
+        }
+
+        internal void SetImageLocation(string value, bool forceUpdate)
+        {
+            if (!String.IsNullOrEmpty(Config.ReportSettings.ImageLocationRoot))
+                imageLocation = value.Replace(Config.ReportSettings.ImageLocationRoot, "");
+            else
+                imageLocation = value;
+
+            if (forceUpdate)
+                UpdateImageLocation();
+        }
+
+        internal void UpdateImageLocation()
+        {
+            LoadImage();
+            ResetImageIndex();
         }
     }
 }

@@ -75,7 +75,6 @@ namespace FastReport.Barcode
             Right
         }
 
-
         #region Fields
         private int angle;
         private bool autoSize;
@@ -94,6 +93,7 @@ namespace FastReport.Barcode
         private bool asBitmap;
         private Alignment horzAlign;
         private RectangleF origRect;
+        private bool showMarker;
         #endregion
 
         #region Properties
@@ -172,6 +172,7 @@ namespace FastReport.Barcode
                 {
                     Type bartype = Barcodes.GetType(value);
                     Barcode = Activator.CreateInstance(bartype) as BarcodeBase;
+                    Text = barcode.GetDefaultValue();
                 }
             }
         }
@@ -319,12 +320,24 @@ namespace FastReport.Barcode
             get { return asBitmap; }
             set { asBitmap = value; }
         }
+
+        /// <summary>
+        /// Gets or sets values for hiding or showing barcode markers
+        /// </summary>
+        [DefaultValue(true)]
+        [Category("Appearance")]
+        public bool ShowMarker
+        {
+            get { return showMarker; }
+            set { showMarker = value; }
+        }
+
         #endregion
 
         #region Private Methods
         private void SetBarcodeProperties()
         {
-            barcode.Initialize(Text, ShowText, Angle, Zoom);
+            barcode.Initialize(Text, ShowText, Angle, Zoom, ShowMarker);
         }
 
         private void DrawBarcode(FRPaintEventArgs e)
@@ -405,7 +418,7 @@ namespace FastReport.Barcode
         {
             if (HorzAlign == Alignment.Left || origRect == RectangleF.Empty)
                 return;
-            switch( HorzAlign)
+            switch (HorzAlign)
             {
                 case Alignment.Center:
                     {
@@ -442,6 +455,7 @@ namespace FastReport.Barcode
             AllowExpressions = src.AllowExpressions;
             AsBitmap = src.AsBitmap;
             HorzAlign = src.HorzAlign;
+            ShowMarker = src.ShowMarker;
         }
 
         /// <inheritdoc/>
@@ -475,8 +489,23 @@ namespace FastReport.Barcode
             }
             else
             {
-                e.Graphics.DrawString(errorText, DrawUtils.DefaultReportFont, Brushes.Red,
-                  new RectangleF(AbsLeft * e.ScaleX, AbsTop * e.ScaleY, Width * e.ScaleX, Height * e.ScaleY));
+                if (IsDesigning && text.StartsWith(Brackets.Split(',')[0]) && Text.EndsWith(Brackets.Split(',')[1]))
+                {
+                    try
+                    {
+                        barcode.text = barcode.GetDefaultValue();
+                        DrawBarcode(e);
+                        error = false;
+                    }
+                    catch
+                    {
+                        error = true;
+                    }
+                }
+
+                if (error)
+                    e.Graphics.DrawString(errorText, DrawUtils.DefaultReportFont, Brushes.Red,
+                        new RectangleF(AbsLeft * e.ScaleX, AbsTop * e.ScaleY, Width * e.ScaleX, Height * e.ScaleY));
             }
             DrawMarkers(e);
             Border.Draw(e, new RectangleF(AbsLeft, AbsTop, Width, Height));
@@ -516,6 +545,8 @@ namespace FastReport.Barcode
                 writer.WriteBool("AsBitmap", AsBitmap);
             if (HorzAlign != c.HorzAlign)
                 writer.WriteValue("HorzAlign", HorzAlign);
+            if (ShowMarker != c.ShowMarker)
+                writer.WriteValue("ShowMarker", ShowMarker);
             Barcode.Serialize(writer, "Barcode.", c.Barcode);
         }
 
@@ -536,7 +567,7 @@ namespace FastReport.Barcode
             {
                 if (AllowExpressions && !String.IsNullOrEmpty(Brackets))
                 {
-                    string[] brackets = Brackets.Split(new char[] { ',' });
+                    string[] brackets = Brackets.Split(',');
                     // collect expressions found in the text
                     expressions.AddRange(CodeUtils.GetExpressions(Text, brackets[0], brackets[1]));
                 }
@@ -562,6 +593,11 @@ namespace FastReport.Barcode
         public override void GetData()
         {
             base.GetData();
+            GetDataShared();
+        }
+
+        private void GetDataShared()
+        {
             if (!String.IsNullOrEmpty(DataColumn))
             {
                 object value = Report.GetColumnValue(DataColumn);
@@ -577,7 +613,7 @@ namespace FastReport.Barcode
                 // process expressions
                 if (AllowExpressions && !String.IsNullOrEmpty(this.brackets))
                 {
-                    string[] bracket_arr = this.brackets.Split(new char[] { ',' });
+                    string[] bracket_arr = this.brackets.Split(',');
                     FindTextArgs args = new FindTextArgs();
                     args.Text = new FastString(Text);
                     args.OpenBracket = bracket_arr[0];
@@ -586,7 +622,7 @@ namespace FastReport.Barcode
                     while (args.StartIndex < args.Text.Length)
                     {
                         string expression = CodeUtils.GetExpression(args, false);
-                        if (expression == "")
+                        if (expression == null)
                             break;
 
                         string value = Report.Calc(expression).ToString();
@@ -612,6 +648,35 @@ namespace FastReport.Barcode
                 {
                 }
             }
+
+            if (Barcode is BarcodeQR)
+            {
+                //QRData.Parse(Text);
+
+                //QRSwiss qRSwiss = new QRSwiss(Text);
+                //Text = qRSwiss.Pack();
+
+                QRData qr = QRData.Parse(Text);
+
+                if (qr is QRSwiss)
+                {
+                    QRSwiss _qr = qr as QRSwiss;
+
+                    QRSwissParameters parameters = new QRSwissParameters();
+                    parameters.Iban = _qr._Iban;
+                    parameters.Creditor = _qr.Creditor;
+                    parameters.Reference = _qr._Reference;
+                    parameters.AlternativeProcedure1 = _qr.AlternativeProcedure1;
+                    parameters.AlternativeProcedure2 = _qr.AlternativeProcedure2;
+                    parameters.AdditionalInformation = _qr._AdditionalInformation;
+                    parameters.Amount = _qr.Amount;
+                    parameters.Currency = _qr._Currency;
+                    parameters.Debitor = _qr.Debitor;
+                    QRSwiss swissQR = new QRSwiss(parameters);
+
+                    Text = swissQR.Pack();
+                }
+            }
         }
         #endregion
 
@@ -624,8 +689,9 @@ namespace FastReport.Barcode
             AutoSize = true;
             DataColumn = "";
             Expression = "";
-            Text = "12345678";
+            Text = Barcode.GetDefaultValue();
             ShowText = true;
+            ShowMarker = true;
             Padding = new Padding();
             Zoom = 1;
             HideIfNoData = true;
@@ -634,9 +700,7 @@ namespace FastReport.Barcode
             Brackets = "[,]";
             SetFlags(Flags.HasSmartTag, true);
         }
-
     }
-
 
     internal static class Barcodes
     {
@@ -648,46 +712,53 @@ namespace FastReport.Barcode
         {
             public readonly Type objType;
             public readonly string barcodeName;
+            public readonly string category;
 
-            public BarcodeItem(Type objType, string barcodeName)
+            public BarcodeItem(Type objType, string barcodeName, string category)
             {
                 this.objType = objType;
                 this.barcodeName = barcodeName;
+                this.category = category;
             }
         }
 
         public readonly static BarcodeItem[] Items = {
-            new BarcodeItem(typeof(Barcode2of5Interleaved), "2/5 Interleaved"),
-            new BarcodeItem(typeof(Barcode2of5Industrial), "2/5 Industrial"),
-            new BarcodeItem(typeof(Barcode2of5Matrix), "2/5 Matrix"),
-            new BarcodeItem(typeof(BarcodeDeutscheIdentcode), "Deutsche Identcode"),
-            new BarcodeItem(typeof(BarcodeDeutscheLeitcode),"Deutshe Leitcode"),
-            new BarcodeItem(typeof(BarcodeITF14), "ITF-14"),
-            new BarcodeItem(typeof(BarcodeCodabar), "Codabar"),
-            new BarcodeItem(typeof(Barcode128), "Code128"),
-            new BarcodeItem(typeof(Barcode39), "Code39"),
-            new BarcodeItem(typeof(Barcode39Extended), "Code39 Extended"),
-            new BarcodeItem(typeof(Barcode93), "Code93"),
-            new BarcodeItem(typeof(Barcode93Extended), "Code93 Extended"),
-            new BarcodeItem(typeof(BarcodeEAN8), "EAN8"),
-            new BarcodeItem(typeof(BarcodeEAN13), "EAN13"),
-            new BarcodeItem(typeof(BarcodeMSI), "MSI"),
-            new BarcodeItem(typeof(BarcodePostNet), "PostNet"),
-            new BarcodeItem(typeof(BarcodeJapanPost4StateCode), "Japan Post 4 State Code"),
-            new BarcodeItem(typeof(BarcodeUPC_A), "UPC-A"),
-            new BarcodeItem(typeof(BarcodeUPC_E0), "UPC-E0"),
-            new BarcodeItem(typeof(BarcodeUPC_E1), "UPC-E1"),
-            new BarcodeItem(typeof(BarcodeSupplement2), "Supplement 2"),
-            new BarcodeItem(typeof(BarcodeSupplement5), "Supplement 5"),
-            new BarcodeItem(typeof(BarcodePDF417), "PDF417"),
-            new BarcodeItem(typeof(BarcodeDatamatrix), "Datamatrix"),
-            new BarcodeItem(typeof(BarcodeQR), "QR Code"),
-            new BarcodeItem(typeof(BarcodeAztec), "Aztec"),
-            new BarcodeItem(typeof(BarcodePlessey), "Plessey"),
-            new BarcodeItem(typeof(BarcodeEAN128), "GS1-128 (UCC/EAN-128)"),
-            new BarcodeItem(typeof(BarcodePharmacode), "Pharmacode"),
-            new BarcodeItem(typeof(BarcodeIntelligentMail), "Intelligent Mail (USPS)"),
-            new BarcodeItem(typeof(BarcodeMaxiCode), "MaxiCode")
+            new BarcodeItem(typeof(Barcode2of5Interleaved), "2/5 Interleaved", "Others"),
+            new BarcodeItem(typeof(Barcode2of5Industrial), "2/5 Industrial", "Others"),
+            new BarcodeItem(typeof(Barcode2of5Matrix), "2/5 Matrix", "Others"),
+            new BarcodeItem(typeof(BarcodeDeutscheIdentcode), "Deutsche Identcode", "Post"),
+            new BarcodeItem(typeof(BarcodeDeutscheLeitcode),"Deutsche Leitcode", "Post"),
+            new BarcodeItem(typeof(BarcodeITF14), "ITF-14", "Others"),
+            new BarcodeItem(typeof(BarcodeCodabar), "Codabar", "Others"),
+            new BarcodeItem(typeof(Barcode128), "Code128", "Others"),
+            new BarcodeItem(typeof(Barcode39), "Code39", "Others"),
+            new BarcodeItem(typeof(Barcode39Extended), "Code39 Extended", "Others"),
+            new BarcodeItem(typeof(Barcode93), "Code93", "Others"),
+            new BarcodeItem(typeof(Barcode93Extended), "Code93 Extended", "Others"),
+            new BarcodeItem(typeof(BarcodeEAN8), "EAN8", "EANUPC"),
+            new BarcodeItem(typeof(BarcodeEAN13), "EAN13", "EANUPC"),
+            new BarcodeItem(typeof(BarcodeMSI), "MSI", "Others"),
+            new BarcodeItem(typeof(BarcodePostNet), "PostNet", "Post"),
+            new BarcodeItem(typeof(BarcodeJapanPost4StateCode), "Japan Post 4 State Code", "Post"),
+            new BarcodeItem(typeof(BarcodeUPC_A), "UPC-A", "EANUPC"),
+            new BarcodeItem(typeof(BarcodeUPC_E0), "UPC-E0", "EANUPC"),
+            new BarcodeItem(typeof(BarcodeUPC_E1), "UPC-E1", "EANUPC"),
+            new BarcodeItem(typeof(BarcodeSupplement2), "Supplement 2", "Others"),
+            new BarcodeItem(typeof(BarcodeSupplement5), "Supplement 5", "Others"),
+            new BarcodeItem(typeof(BarcodePDF417), "PDF417", "2D"),
+            new BarcodeItem(typeof(BarcodeDatamatrix), "Datamatrix", "2D"),
+            new BarcodeItem(typeof(BarcodeQR), "QR Code", "2D"),
+            new BarcodeItem(typeof(BarcodeAztec), "Aztec", "2D"),
+            new BarcodeItem(typeof(BarcodePlessey), "Plessey", "Others"),
+            new BarcodeItem(typeof(BarcodeEAN128), "GS1-128 (UCC/EAN-128)", "GS1"),
+            new BarcodeItem(typeof(BarcodeGS1Omnidirectional), "GS1 DataBar Omnidirectional", "GS1"),
+            new BarcodeItem(typeof(BarcodeGS1Limited), "GS1 DataBar Limited", "GS1"),
+            new BarcodeItem(typeof(BarcodeGS1Stacked), "GS1 DataBar Stacked", "GS1"),
+            new BarcodeItem(typeof(BarcodeGS1StackedOmnidirectional), "GS1 DataBar Stacked Omnidirectional", "GS1"),
+            new BarcodeItem(typeof(BarcodeGS1Datamatrix), "GS1 Datamatrix", "GS1"),
+            new BarcodeItem(typeof(BarcodePharmacode), "Pharmacode", "Others"),
+            new BarcodeItem(typeof(BarcodeIntelligentMail), "Intelligent Mail (USPS)", "Post"),
+            new BarcodeItem(typeof(BarcodeMaxiCode), "MaxiCode", "2D")
         };
 
         public static string GetName(Type type)

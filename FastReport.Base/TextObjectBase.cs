@@ -402,13 +402,13 @@ namespace FastReport
 
         internal string GetTextWithBrackets(string text)
         {
-            string[] brackets = Brackets.Split(new char[] { ',' });
+            string[] brackets = Brackets.Split(',');
             return brackets[0] + text + brackets[1];
         }
 
         internal string GetTextWithoutBrackets(string text)
         {
-            string[] brackets = Brackets.Split(new char[] { ',' });
+            string[] brackets = Brackets.Split(',');
             if (text.StartsWith(brackets[0]))
                 text = text.Remove(0, brackets[0].Length);
             if (text.EndsWith(brackets[1]))
@@ -460,7 +460,8 @@ namespace FastReport
             }
             catch (Exception e)
             {
-                throw new Exception(Name + ": " + Res.Get("Messages,ErrorInExpression") + ": " + expression, e.InnerException);
+                throw new Exception(Name + ": " + Res.Get("Messages,ErrorInExpression") + ": " + expression,
+                    e.InnerException == null ? e : e.InnerException);
             }
         }
 

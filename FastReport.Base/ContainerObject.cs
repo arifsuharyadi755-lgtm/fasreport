@@ -16,6 +16,7 @@ namespace FastReport
         private bool updatingLayout;
         private string beforeLayoutEvent;
         private string afterLayoutEvent;
+        private int savedOriginalObjectsCount;
         #endregion
 
         #region Properties
@@ -74,7 +75,7 @@ namespace FastReport
         /// <inheritdoc/>
         public virtual bool CanContain(Base child)
         {
-            return (child is ReportComponentBase);
+            return (child is ReportComponentBase) && (child is not SubreportObject);
         }
 
         /// <inheritdoc/>
@@ -191,9 +192,9 @@ namespace FastReport
         public override void SaveState()
         {
             base.SaveState();
+            savedOriginalObjectsCount = Objects.Count;
             SetRunning(true);
             SetDesigning(false);
-            OnBeforePrint(EventArgs.Empty);
 
             foreach (ReportComponentBase obj in Objects)
             {
@@ -207,8 +208,11 @@ namespace FastReport
         /// <inheritdoc/>
         public override void RestoreState()
         {
-            OnAfterPrint(EventArgs.Empty);
             base.RestoreState();
+            while (Objects.Count > savedOriginalObjectsCount)
+            {
+                Objects[Objects.Count - 1].Dispose();
+            }
             SetRunning(false);
 
             foreach (ReportComponentBase obj in Objects)
@@ -223,7 +227,8 @@ namespace FastReport
         public override void GetData()
         {
             base.GetData();
-            foreach (ReportComponentBase obj in Objects)
+            var objArray = Objects.ToArray();
+            foreach (ReportComponentBase obj in objArray)
             {
                 obj.GetData();
                 obj.OnAfterData();
@@ -233,7 +238,6 @@ namespace FastReport
                     (obj as BreakableComponent).BreakTo.GetType() == obj.GetType())
                     (obj as BreakableComponent).Break((obj as BreakableComponent).BreakTo);
             }
-            OnAfterData();
         }
 
         /// <inheritdoc/>
@@ -305,18 +309,15 @@ namespace FastReport
                 obj.Dock = saveDock;
             }
 
-            if ((CanGrow && maxHeight > Height) || (CanShrink && maxHeight < Height))
-                Height = maxHeight;
-
             // perform grow to bottom
             foreach (ReportComponentBase obj in Objects)
             {
-                if (obj.GrowToBottom)
-                    obj.Height = Height - obj.Top;
+                if (obj.GrowToBottom || obj.Bottom > maxHeight)
+                    obj.Height = maxHeight - obj.Top;
             }
 
             OnAfterLayout(EventArgs.Empty);
-            return Height;
+            return maxHeight;
         }
 
         /// <summary>

@@ -45,7 +45,7 @@ namespace FastReport.Data
             {
                 CsvConnectionStringBuilder builder = new CsvConnectionStringBuilder(ConnectionString);
                 builder.CsvFile = value;
-                ConnectionString = builder.ToString();
+                ConnectionString = CheckForChangeConnection(builder);
             }
         }
 
@@ -124,7 +124,6 @@ namespace FastReport.Data
                 ConnectionString = builder.ToString();
             }
         }
-
 
         /// <summary>
         /// Gets or sets the value indicating that field types fhould be converted.
@@ -223,11 +222,34 @@ namespace FastReport.Data
         {
             DataSet dataset = base.CreateDataSet();
             CsvConnectionStringBuilder builder = new CsvConnectionStringBuilder(ConnectionString);
+            RelatedPathCheck(builder);
             List<string> rawLines = CsvUtils.ReadLines(builder);
             DataTable table = CsvUtils.CreateDataTable(builder, rawLines);
             if (table != null)
                 dataset.Tables.Add(table);
             return dataset;
+        }
+
+        /// <summary>
+        /// Checking a relative path relative to a file
+        /// </summary>
+        protected void RelatedPathCheck(CsvConnectionStringBuilder builder)
+        {
+            // checking for an empty file path string
+            if (string.IsNullOrEmpty(builder.CsvFile))
+                throw new Exception(Res.Get("ConnectionEditors,Common,OnlyUrlException"));
+
+            if (Report == null || string.IsNullOrEmpty(Report.FileName))
+                return;
+
+            // combining a path will only work if the path is relative
+            if (!File.Exists(builder.CsvFile))
+            {
+                Uri.TryCreate(builder.CsvFile, UriKind.RelativeOrAbsolute, out Uri uri);
+                if (!uri.IsAbsoluteUri)
+                    if (!Path.GetDirectoryName(Report.FileName).Equals(Path.GetDirectoryName(builder.CsvFile)))
+                        builder.CsvFile = Path.Combine(Path.GetDirectoryName(Report.FileName), builder.CsvFile);
+            }
         }
 
         /// <inheritdoc/>
@@ -240,7 +262,6 @@ namespace FastReport.Data
         #endregion Protected Methods
 
         #region Public Methods
-
 
         /// <inheritdoc/>
         public override void FillTableSchema(DataTable table, string selectCommand, CommandParameterCollection parameters)
@@ -279,7 +300,6 @@ namespace FastReport.Data
         {
             return value;
         }
-
 
         /// <inheritdoc/>
         public override string[] GetTableNames()

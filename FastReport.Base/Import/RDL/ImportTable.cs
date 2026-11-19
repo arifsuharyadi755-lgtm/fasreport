@@ -516,13 +516,6 @@ namespace FastReport.Import.RDL
 
         private void LoadTable(XmlNode tableNode)
         {
-            if (parent is TableCell)
-            {
-                if(curBand != null)
-                    parent = curBand;
-                else
-                    return;
-            }
             component = ComponentsFactory.CreateTableObject(tableNode.Attributes["Name"].Value, parent);
             XmlNodeList nodeList = tableNode.ChildNodes;
             LoadReportItem(nodeList);

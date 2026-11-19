@@ -1,16 +1,13 @@
-﻿using System;
+﻿using FastReport.Web.Toolbar;
+using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.Threading.Tasks;
-using System.Linq;
 using System.Drawing;
+using System.Linq;
 
 namespace FastReport.Web
 {
     public class ToolbarSettings
     {
-
         public static ToolbarSettings Default => new ToolbarSettings();
 
         public bool Show { get; set; } = true;
@@ -18,6 +15,8 @@ namespace FastReport.Web
 #if DIALOGS
         public bool ShowOnDialogPage { get; set; } = true;
 #endif
+
+
         [Obsolete("Please, use Position")]
         public bool ShowBottomToolbar
         {
@@ -33,6 +32,9 @@ namespace FastReport.Web
             }
         }
 
+        /// <summary>
+        /// ExportMenu settings
+        /// </summary>
         public ExportMenuSettings Exports { get; set; } = ExportMenuSettings.Default;
 
         public bool ShowPrevButton { get; set; } = true;
@@ -41,16 +43,29 @@ namespace FastReport.Web
         public bool ShowLastButton { get; set; } = true;
         public bool ShowRefreshButton { get; set; } = true;
         public bool ShowZoomButton { get; set; } = true;
+        public bool ShowSearchButton { get; set; } = true;
+
+        /// <summary>
+        /// Show Print menu
+        /// </summary>
         public bool ShowPrint { get; set; } = true;
+
         public bool PrintInHtml { get; set; } = true;
+        /// <summary>
+        /// If enabled, the toolbar will follow the scrolling of the report.
+        /// </summary>
+        /// <remarks>
+        /// Default value: false
+        /// </remarks>
+        public bool Sticky { get; set; } = false;
 #if !OPENSOURCE
         public bool PrintInPdf { get; set; } = true;
 #endif
         /// <summary>
         /// Use to change ToolbarColor,
-        /// Default value Color.LightGray
+        /// Default value Color.WhiteSmoke
         /// </summary>
-        public Color Color { get; set; } = Color.LightGray;
+        public Color Color { get; set; } = Color.WhiteSmoke;
         /// <summary>
         /// Use to change Toolbar DropDownMenuColor,
         /// Default value Color.White
@@ -68,14 +83,14 @@ namespace FastReport.Web
         public Positions Position { get; set; } = Positions.Top;
         /// <summary>
         /// Use to add Roundness to Toolbar,
-        /// Default value RoundnessEnum.None
+        /// Default value RoundnessEnum.High
         /// </summary>
-        public RoundnessEnum Roundness { get; set; } = RoundnessEnum.None;
+        public RoundnessEnum Roundness { get; set; } = RoundnessEnum.High;
         /// <summary>
         /// Use to change content position in Toolbar,
-        /// Default value ContentPositions.Left
+        /// Default value ContentPositions.Center
         /// </summary>
-        public ContentPositions ContentPosition { get; set; } = ContentPositions.Left;
+        public ContentPositions ContentPosition { get; set; } = ContentPositions.Center;
         /// <summary>
         /// Use to change Icons color in Toolbar,
         /// Default value IconColors.Black
@@ -83,18 +98,143 @@ namespace FastReport.Web
         public IconColors IconColor { get; set; } = IconColors.Black;
         /// <summary>
         /// Use to add Transparency in icon Toolbar,
-        /// Default value IconTransparencyEnum.Default
+        /// Default value IconTransparencyEnum.None
         /// </summary>
-        public IconTransparencyEnum IconTransperency { get; set; } = IconTransparencyEnum.Default;
+        public IconTransparencyEnum IconTransperency { get; set; } = IconTransparencyEnum.None;
         /// <summary>
         /// Use to change Font in Toolbar,
         /// Default value null
         /// <para>Example syntax : new Font("Arial", 14 , FontStyle.Bold)</para>
         /// </summary>
         public Font FontSettings { get; set; } = null;
+        /// <summary>
+        /// Use to change search highlight,
+        /// Default value Color.Yellow
+        /// </summary>
+        public Color SearchHighlight {  get; set; } = Color.Yellow;
 
+        public int Height { get; set; } = 40;
 
+        internal List<ToolbarElement> Elements { get; set; } = new List<ToolbarElement>();
 
+        /// <summary>
+        /// Adds an item to the toolbar
+        /// </summary>
+        /// <param name="element">Any inheritor of ToolbarElement. Can be a TolbarButton, ToolbarSelect, or ToolbarInput</param>
+        public void InsertToolbarElement(ToolbarElement element)
+        {
+            if (Elements.Any(x => x.Name == element.Name)) return;
+
+            var index = Elements.FindIndex(x => x.Position > element.Position);
+
+            if (index < 0 || element.Position == -1)
+            {
+                if (Elements.Count != 0)
+                    element.Position = Elements.Max(x => x.Position) + 1;
+                else
+                    element.Position = 0;
+
+                Elements.Add(element);
+            }
+            else
+            {
+                Elements.Insert(index, element);
+            }
+        }
+
+        internal int ToolbarSlash
+        {
+            get
+            {
+                switch (Position)
+                {
+                    case Positions.Left:
+                    case Positions.Right:
+                        return 90;
+                    default:
+                        return 20;
+                }
+            }
+        }
+        
+        internal string StickyToolbarTags 
+        { 
+            get
+            {
+                if (Sticky)
+                {
+                    string tags = "position: sticky; position: -webkit-sticky; ";
+                    if(TopOrBottom == -1)
+                    {
+                        if (Position == Positions.Left || Position == Positions.Right) 
+                        {
+                            if (ContentPosition == ContentPositions.Right)
+                                tags += "bottom: 10px; left: 10px; right: 10px;";
+                            else if (ContentPosition == ContentPositions.Center)
+                                tags += "top: 10px; bottom: 10px; left: 10px; right: 10px;";
+                        }
+                        else
+                            tags += "top: 10px; left: 10px; right: 10px;";
+                    }
+                    else
+                        tags += "bottom: 10px; left: 10px; right: 10px;";
+                    return tags;
+                }
+                else
+                    return "";
+            }
+        }
+
+        internal string StickyToolbarTabsTags
+        {
+            get
+            {
+                if (Sticky)
+                {
+                    int paddingVertical = Height + 10;
+                    float paddingHorizontal = Height * 1.55f + 10;
+                    string tags = "position: sticky; position: -webkit-sticky; ";
+                    if (TopOrBottom == -1)
+                    {
+                        if (Position == Positions.Left || Position == Positions.Right)
+                        {
+                            if (ContentPosition == ContentPositions.Right)
+                                tags += $@"bottom: {paddingVertical}px; left: {paddingHorizontal}px; right: {paddingHorizontal}px;";
+                            else if (ContentPosition == ContentPositions.Center)
+                                tags += $@"top: {paddingVertical}px; bottom: {paddingVertical}px; left: {paddingHorizontal}px; right: {paddingHorizontal}px;";
+                        }
+                        else
+                            tags += $@"top: {paddingVertical}px; left: 10px; right: 10px;";
+                    }
+                    else
+                        tags += $@"bottom: {paddingVertical}px; left: 10px; right: 10px;";
+                    return tags;
+                }
+                else
+                    return "";
+            }
+        }
+
+        internal string ModalContainerPosition => Sticky ? "position: fixed;" : "";
+
+        internal string DropDownListPosition => Position == Positions.Bottom ? "bottom: 100%" : "";
+
+        internal string DropDownListBorder => Position == Positions.Bottom ? "12px 12px 0px 0px" : "0px 0px 12px 12px";
+
+        internal int ToolbarNarrow
+        {
+            get
+            {
+                switch (Position)
+                {
+                    case Positions.Left:
+                    case Positions.Right:
+                        return 90;
+                    default:
+                        return 0;
+                }
+            }
+        }
 
         internal string UserFontSettings
         {
@@ -110,7 +250,7 @@ namespace FastReport.Web
         }
 
         
-        internal int VerticalToolbarHeight
+        internal string VerticalToolbarHeight
         {
             get
             {
@@ -118,12 +258,13 @@ namespace FastReport.Web
                 {
                     case Positions.Left:
                     case Positions.Right:
-                        return 100;
+                        return "fit-content";
                     default:
-                        return 40;
+                        return Height.ToString() + "px";
                 }
             }
         }
+        
         internal int TopOrBottom
         {
             get
@@ -162,7 +303,7 @@ namespace FastReport.Web
                 {
                     case Positions.Left:
                     case Positions.Right:
-                        return 50;
+                        return Height + 10;
                     default:
                         return 0;
                 }
@@ -206,6 +347,8 @@ namespace FastReport.Web
                         return "center";
                     case ContentPositions.Right:
                         return "flex-end";
+                    case ContentPositions.Left:
+                        return "flex-start";
                     default:
                         return "flex-start";
                 }
@@ -218,13 +361,13 @@ namespace FastReport.Web
                 switch (Position)
                 {
                     case Positions.Left:
-                        return "left:48px;" + "text-align:left;" + "top:8px;";
+                        return "left:" + Height + "px;" + "text-align:left;" + "top:8px;";
                     case Positions.Right:
-                        return "right:48px;" + "text-align:right;" + "top:8px;";
+                        return "right:" + Height + "px;" + "text-align:right;" + "top:8px;";
                     case Positions.Bottom:
-                        return "bottom:40px;";
+                        return "bottom:" + Height + "px;";
                     default:
-                        return "top: 40px;";
+                        return "top:" + Height + "px;";
                 }
             }
         }
@@ -282,6 +425,8 @@ namespace FastReport.Web
             {
                 switch (IconTransperency)
                 {
+                    case IconTransparencyEnum.None:
+                        return "1";
                     case IconTransparencyEnum.Low:
                         return "0.9";
                     case IconTransparencyEnum.Medium:
@@ -301,7 +446,7 @@ namespace FastReport.Web
     }
     public enum IconTransparencyEnum
     {
-        Low, Medium, High, Default
+        Low, Medium, High, Default, None
     }
     public enum Positions
     {

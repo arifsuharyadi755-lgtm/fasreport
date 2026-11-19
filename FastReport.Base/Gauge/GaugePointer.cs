@@ -8,18 +8,21 @@ namespace FastReport.Gauge
     /// <summary>
     /// Represents a pointer of gauge.
     /// </summary>
-    public class GaugePointer : Component
+#if !DEBUG
+    [DesignTimeVisible(false)]
+#endif
+    public class GaugePointer
     {
-#region Fields
+        #region Fields
 
         private GaugeObject parent;
         private FillBase fill;
         private float borderWidth;
         private Color borderColor;
 
-#endregion // Fields
+        #endregion // Fields
 
-#region Properties
+        #region Properties
 
         /// <summary>
         /// Gets or sets the parent gauge object.
@@ -62,9 +65,9 @@ namespace FastReport.Gauge
             set { borderColor = value; }
         }
 
-#endregion // Properties
+        #endregion // Properties
 
-#region Constructors
+        #region Constructors
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GaugePointer"/> class.
@@ -78,9 +81,9 @@ namespace FastReport.Gauge
             this.parent = parent;
         }
 
-#endregion // Constructors
+        #endregion // Constructors
 
-#region Public Methods
+        #region Public Methods
 
         /// <summary>
         /// Copies the contents of another GaugePointer.
@@ -88,7 +91,7 @@ namespace FastReport.Gauge
         /// <param name="src">The GaugePointer instance to copy the contents from.</param>
         public virtual void Assign(GaugePointer src)
         {
-            Fill = src.Fill;
+            Fill = src.Fill.Clone();
             BorderWidth = src.BorderWidth;
             BorderColor = src.BorderColor;
         }
@@ -123,6 +126,6 @@ namespace FastReport.Gauge
             }
         }
 
-#endregion // Public Methods
+        #endregion // Public Methods
     }
 }
