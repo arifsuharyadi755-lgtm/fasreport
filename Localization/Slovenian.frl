@@ -110,6 +110,7 @@
     </Shapes>
     <PictureObject Text="Slika"/>
     <TableObject Text="Tabela"/>
+    <Matrix Text="Matrica"/>
     <MatrixObject Text="Matrica"/>
     <SubreportObject Text="Podporočilo"/>
     <BarcodeObject Text="Črtna koda"/>
@@ -1694,7 +1695,7 @@
       <InsertToRight Text="Vstavi stolpec desno"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Združi celice"/>
+      <Merge Text="Združi celice"/>
       <Split Text="Razdeli celice"/>
     </TableCell>
     <MatrixObject>

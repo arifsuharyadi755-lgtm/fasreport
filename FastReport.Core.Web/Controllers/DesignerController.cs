@@ -31,7 +31,7 @@ namespace FastReport.Web.Controllers
                 if (!FindWebReport(out WebReport webReport))
                     return new NotFoundResult();
 
-                if (webReport.DesignerSaveMethod == null)
+                if (webReport.Designer.SaveMethod == null)
                 {
                     // old saving way by self-request
                     return webReport.DesignerSaveReport(Context);
@@ -46,9 +46,9 @@ namespace FastReport.Web.Controllers
                     int code = 200;
                     try
                     {
-                        msg = webReport.DesignerSaveMethod(webReport.ID, webReport.ReportFileName, report);
+                        msg = webReport.Designer.SaveMethod(webReport.ID, webReport.ReportFileName, report);
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         code = 500;
                         msg = ex.Message;
@@ -81,7 +81,7 @@ namespace FastReport.Web.Controllers
                 {
                     StatusCode = (int)HttpStatusCode.OK,
                     ContentType = "application/json",
-                    Content = webReport.DesignerConfig.IsNullOrWhiteSpace() ? "{}" : webReport.DesignerConfig,
+                    Content = webReport.Designer.Config.IsNullOrWhiteSpace() ? "{}" : webReport.Designer.Config,
                 };
             });
 
@@ -115,6 +115,29 @@ namespace FastReport.Web.Controllers
             {
                 return MakeConnectionString();
             });
+
+            RegisterHandler("/designer.objects/mschart/template", () =>
+            {
+                string result;
+                var resourceName = Request.Query["name"].ToString();
+                var stream = ResourceLoader.GetStream("MSChart." + resourceName + ".xml");
+
+                try
+                {
+                    result = new StreamReader(stream).ReadToEnd();
+                }
+                catch(Exception ex)
+                {
+                    return new NotFoundResult();
+                };
+
+                return new ContentResult()
+                {
+                    StatusCode = (int)HttpStatusCode.OK,
+                    ContentType = "application/xml",
+                    Content = result
+                };
+            });
         }
 
         #endregion
@@ -130,11 +153,11 @@ namespace FastReport.Web.Controllers
         IActionResult GetConnectionTypes()
         {
             var names = new List<string>();
-            var objects = new List<ObjectInfo>();
-            RegisteredObjects.Objects.EnumItems(objects);
+            var objects = new List<DataConnectionInfo>();
+            RegisteredObjects.DataConnections.EnumItems(objects);
 
             foreach (var info in objects)
-                if (info.Object != null && info.Object.IsSubclassOf(typeof(DataConnectionBase)))
+                if (info.Object != null)
                     names.Add($@"""{info.Object.FullName}"":""{Res.TryGetBuiltin(info.Text)}""");
 
             return new ContentResult()
@@ -147,13 +170,12 @@ namespace FastReport.Web.Controllers
 
         IActionResult GetConnectionTables(string connectionType, string connectionString)
         {
-            var objects = new List<ObjectInfo>();
-            RegisteredObjects.Objects.EnumItems(objects);
+            var objects = new List<DataConnectionInfo>();
+            RegisteredObjects.DataConnections.EnumItems(objects);
             Type connType = null;
 
             foreach (var info in objects)
                 if (info.Object != null &&
-                    info.Object.IsSubclassOf(typeof(DataConnectionBase)) &&
                     info.Object.FullName == connectionType)
                 {
                     connType = info.Object;
@@ -256,13 +278,12 @@ namespace FastReport.Web.Controllers
             var connectionType = Request.Query["connectionType"].ToString();
             var connectionString = Request.Query["connectionString"].ToString();
 
-            var objects = new List<ObjectInfo>();
-            RegisteredObjects.Objects.EnumItems(objects);
+            var objects = new List<DataConnectionInfo>();
+            RegisteredObjects.DataConnections.EnumItems(objects);
             Type connType = null;
 
             foreach (var info in objects)
                 if (info.Object != null &&
-                    info.Object.IsSubclassOf(typeof(DataConnectionBase)) &&
                     info.Object.FullName == connectionType)
                 {
                     connType = info.Object;
@@ -347,13 +368,12 @@ namespace FastReport.Web.Controllers
         {
             var connectionType = Request.Query["connectionType"].ToString();
 
-            var objects = new List<ObjectInfo>();
-            RegisteredObjects.Objects.EnumItems(objects);
+            var objects = new List<DataConnectionInfo>();
+            RegisteredObjects.DataConnections.EnumItems(objects);
             Type connType = null;
 
             foreach (var info in objects)
                 if (info.Object != null &&
-                    info.Object.IsSubclassOf(typeof(DataConnectionBase)) &&
                     info.Object.FullName == connectionType)
                 {
                     connType = info.Object;

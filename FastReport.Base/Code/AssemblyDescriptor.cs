@@ -17,6 +17,9 @@ using System.Collections.Concurrent;
 using FastReport.Data;
 using FastReport.Engine;
 using FastReport.Utils;
+#if SKIA
+using HMACSHA1 = FastReport.Utils.DetravHMACSHA1;
+#endif
 
 namespace FastReport.Code
 {
@@ -44,7 +47,7 @@ namespace FastReport.Code
 
         private void InsertItem(string text, string objName)
         {
-            string[] lines = text.Split(new char[] { '\r' });
+            string[] lines = text.Split('\r');
             scriptText.Insert(insertPos, text);
             SourcePosition pos = new SourcePosition(objName, insertLine, insertLine + lines.Length - 2);
             sourcePositions.Add(pos);
@@ -104,7 +107,7 @@ namespace FastReport.Code
             while (args.StartIndex < args.Text.Length)
             {
                 expression = CodeUtils.GetExpression(args, true);
-                if (expression == "")
+                if (expression == null)
                     break;
 
                 if (DataHelper.IsValidColumn(Report.Dictionary, expression))
@@ -132,7 +135,7 @@ namespace FastReport.Code
             return args.Text.ToString();
         }
 
-        private bool ContansAssembly(IEnumerable assemblies, string assembly)
+        private bool ContainsAssembly(IEnumerable assemblies, string assembly)
         {
             string asmName = Path.GetFileName(assembly);
             foreach (string a in assemblies)
@@ -149,7 +152,7 @@ namespace FastReport.Code
             foreach (Assembly assembly in RegisteredObjects.Assemblies)
             {
                 string aLocation = assembly.Location;
-#if NETSTANDARD || NETCOREAPP
+#if CROSSPLATFORM || COREWIN
                 if (aLocation == "")
                 {
                     // try fix SFA in FastReport.Compat
@@ -158,45 +161,54 @@ namespace FastReport.Code
                         aLocation = fixedReference;
                 }
 #endif
-                if (!ContansAssembly(assemblies, aLocation))
+                if (!ContainsAssembly(assemblies, aLocation))
                     assemblies.Add(aLocation);
             }
         }
 
         private void AddReferencedAssemblies(IList assemblies, string defaultPath)
         {
-            foreach (string s in Report.ReferencedAssemblies)
+            for (int i = 0; i < Report.ReferencedAssemblies.Length; i++)
             {
-#if NETSTANDARD
-                // replace 
+                string s = Report.ReferencedAssemblies[i];
+
+#if CROSSPLATFORM
                 if (s == "System.Windows.Forms.dll")
-                {
-                    AddReferencedAssembly(assemblies, defaultPath, "FastReport.Compat");
-                    continue;
-                }
+                    s = "FastReport.Compat";
 #endif
                 // fix for old reports with "System.Windows.Forms.DataVisualization" in referenced assemblies 
                 if (s.IndexOf("System.Windows.Forms.DataVisualization") != -1)
-                {
-                    AddReferencedAssembly(assemblies, defaultPath, "FastReport.DataVisualization");
-                    continue;
-                }
+                    s = "FastReport.DataVisualization";
+#if SKIA
+                if (s.IndexOf("FastReport.Compat") != -1)
+                    s = "FastReport.Compat.Skia";
+                if (s.IndexOf("FastReport.DataVisualization") != -1)
+                    s = "FastReport.DataVisualization.Skia";
+#endif
 
                 AddReferencedAssembly(assemblies, defaultPath, s);
             }
+
+#if SKIA
+            AddReferencedAssembly(assemblies, defaultPath, "FastReport.SkiaDrawing");
+#endif
+
+            // these two required for "dynamic" type support
+            AddReferencedAssembly(assemblies, defaultPath, "System.Core");
+            AddReferencedAssembly(assemblies, defaultPath, "Microsoft.CSharp");
         }
 
         private void AddReferencedAssembly(IList assemblies, string defaultPath, string assemblyName)
         {
             string location = GetFullAssemblyReference(assemblyName, defaultPath);
-            if (location != "" && !ContansAssembly(assemblies, location))
+            if (location != "" && !ContainsAssembly(assemblies, location))
                 assemblies.Add(location);
         }
 
         private string GetFullAssemblyReference(string relativeReference, string defaultPath)
         {
             // in .NET Core we get the AssemblyReference in FR.Compat
-#if !(NETSTANDARD || NETCOREAPP)
+#if !(CROSSPLATFORM || COREWIN)
             if (relativeReference == null || relativeReference.Trim() == "")
                 return "";
 
@@ -313,6 +325,9 @@ namespace FastReport.Code
 
         public void AddExpressions()
         {
+            // speed up the case: lot of report objects (> 1000) and lot of data columns in the dictionary (> 10000). 
+            Report.Dictionary.CacheAllObjects = true;
+
             InsertItem(Report.CodeHelper.BeginCalcExpression(), "");
 
             ObjectCollection allObjects = Report.AllObjects;
@@ -335,6 +350,7 @@ namespace FastReport.Code
             }
 
             InsertItem(Report.CodeHelper.EndCalcExpression(), "");
+            Report.Dictionary.CacheAllObjects = false;
         }
 
         public void AddFunctions()
@@ -361,16 +377,16 @@ namespace FastReport.Code
         {
             if (needCompile)
             {
-                lock(compileLocker)
+                lock (compileLocker)
                 {
                     if (needCompile)
                         InternalCompile();
                 }
-            }    
+            }
         }
 
         private void InternalCompile()
-        {          
+        {
             // configure compiler options
             CompilerParameters cp = new CompilerParameters();
             AddFastReportAssemblies(cp.ReferencedAssemblies);   // 2
@@ -389,22 +405,24 @@ namespace FastReport.Code
             string errors = string.Empty;
             CompilerResults cr;
             bool exception = !InternalCompile(cp, out cr);
-            for (int i = 0; exception && i < RECOMPILE_COUNT ; i++)
+            for (int i = 0; exception && i < RECOMPILE_COUNT; i++)
             {
                 exception = !HandleCompileErrors(cp, cr, out errors);
             }
 
-            if (exception)
+            if (exception && errors != string.Empty)
                 throw new CompilerException(errors);
         }
-        
+
         private string GetAssemblyHash(CompilerParameters cp)
         {
             StringBuilder assemblyHashSB = new StringBuilder();
             foreach (string a in cp.ReferencedAssemblies)
                 assemblyHashSB.Append(a);
-            assemblyHashSB.Append(scriptText.ToString());
-            byte[] hash = null;
+            var script = scriptText.ToString();
+            assemblyHashSB.Append(script);
+            byte[] hash;
+
             using (HMACSHA1 hMACSHA1 = new HMACSHA1(Encoding.ASCII.GetBytes(shaKey)))
             {
                 hash = hMACSHA1.ComputeHash(Encoding.Unicode.GetBytes(assemblyHashSB.ToString()));
@@ -421,11 +439,12 @@ namespace FastReport.Code
 
             // find assembly in cache
             string assemblyHash = GetAssemblyHash(cp);
-            Assembly cachedAssembly = null;
+            Assembly cachedAssembly;
             if (FAssemblyCache.TryGetValue(assemblyHash, out cachedAssembly))
             {
                 Assembly = cachedAssembly;
-                InitInstance(Assembly.CreateInstance("FastReport.ReportScript"));
+                var reportScript = Assembly.CreateInstance("FastReport.ReportScript");
+                InitInstance(reportScript);
                 cr = null;
                 return true;
             }
@@ -438,7 +457,7 @@ namespace FastReport.Code
                 ScriptSecurityEventArgs ssea = new ScriptSecurityEventArgs(Report, scriptText.ToString(), Report.ReferencedAssemblies);
                 Config.OnScriptCompile(ssea);
 
-#if NETSTANDARD || NETCOREAPP
+#if CROSSPLATFORM || COREWIN
                 provider.BeforeEmitCompilation += Config.OnBeforeScriptCompilation;
 #endif
 
@@ -452,9 +471,40 @@ namespace FastReport.Code
                 FAssemblyCache.TryAdd(assemblyHash, cr.CompiledAssembly);
 
                 Assembly = cr.CompiledAssembly;
-                InitInstance(Assembly.CreateInstance("FastReport.ReportScript"));
+                var reportScript = Assembly.CreateInstance("FastReport.ReportScript");
+                InitInstance(reportScript);
                 return true;
             }
+        }
+
+        private string ReplaceExpression(string error, TextObjectBase text)
+        {
+            string result = text.Text;
+            string[] parts = error.Split('\"');
+            if (parts.Length == 3)
+            {
+                string[] expressions = (text as Base).GetExpressions();
+                foreach (string expr in expressions)
+                {
+                    if (expr.Contains(parts[1]))
+                    {
+                        if (!DataHelper.IsValidColumn(Report.Dictionary, expr))
+                        {
+                            string replaceString = text.Brackets[0] + expr + text.Brackets[2];
+                            if (Config.CompilerSettings.ExceptionBehaviour == CompilerExceptionBehaviour.ShowExceptionMessage ||
+                                Config.CompilerSettings.ExceptionBehaviour == CompilerExceptionBehaviour.ReplaceExpressionWithPlaceholder)
+                            {
+                                result = result.Replace(replaceString, Config.CompilerSettings.Placeholder);
+                            }
+                            else if (Config.CompilerSettings.ExceptionBehaviour == CompilerExceptionBehaviour.ReplaceExpressionWithExceptionMessage)
+                            {
+                                result = result.Replace(replaceString, error);
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
         }
 
         /// <summary>
@@ -466,10 +516,10 @@ namespace FastReport.Code
             errors = string.Empty;
             List<string> additionalAssemblies = new List<string>(4);
             Regex regex;
-            
+
             if (Config.WebMode && Config.EnableScriptSecurity)
             {
-                for (int i=0; i < cr.Errors.Count; )
+                for (int i = 0; i < cr.Errors.Count;)
                 {
                     CompilerError ce = cr.Errors[i];
                     if (ce.ErrorNumber == "CS1685") // duplicate class
@@ -485,29 +535,29 @@ namespace FastReport.Code
 
                         const string res = "Web,ScriptSecurity,ForbiddenType";
                         string message = Res.TryGet(res);
-                        if(string.Equals(res, message))
-                            message = "Please, don't use the type " + typeName;
+                        if (string.Equals(res, message))
+                            message = "Please don't use the type " + typeName;
                         else
-                            message = message.Replace("{typeName}", typeName); //$"Please, don't use the type {typeName}";
+                            message = message.Replace("{typeName}", typeName); //$"Please don't use the type {typeName}";
 
                         ce.ErrorText = message;
-                        
+
                     }
                     else if (ce.ErrorNumber == "CS0117") // user using a forbidden method
                     {
                         const string pattern = "[\"'](\\S+)[\"']";
                         regex = new Regex(pattern, RegexOptions.Compiled);
                         MatchCollection mathes = regex.Matches(ce.ErrorText);
-                        if(mathes.Count > 1)
+                        if (mathes.Count > 1)
                         {
                             string methodName = mathes[1].Value;
 
                             const string res = "Web,ScriptSecurity,ForbiddenMethod";
                             string message = Res.TryGet(res);
                             if (string.Equals(res, message))
-                                message = "Please, don't use the method " + methodName;
-                            else 
-                                message = message.Replace("{methodName}", methodName); //$"Please, don't use the method {methodName}";
+                                message = "Please don't use the method " + methodName;
+                            else
+                                message = message.Replace("{methodName}", methodName); //$"Please don't use the method {methodName}";
 
                             ce.ErrorText = message;
                         }
@@ -525,7 +575,7 @@ namespace FastReport.Code
                     try
                     {
                         // in .Net Core compiler will return other quotes
-#if NETSTANDARD || NETCOREAPP
+#if CROSSPLATFORM || COREWIN
                         const string quotes = "\'";
 #else
                         const string quotes = "\"";
@@ -543,8 +593,21 @@ namespace FastReport.Code
                 int line = GetScriptLine(ce.Line);
                 // error is inside own items
                 if (line == -1)
-                { 
+                {
                     string errObjName = GetErrorObjectName(ce.Line);
+
+                    if (Config.CompilerSettings.ExceptionBehaviour != CompilerExceptionBehaviour.Default)
+                    {
+                        // handle errors when name does not exist in the current context
+                        if (ce.ErrorNumber == "CS0103")
+                        {
+                            TextObjectBase text = Report.FindObject(errObjName) as TextObjectBase;
+                            text.Text = ReplaceExpression(ce.ErrorText, text);
+                            if (Config.CompilerSettings.ExceptionBehaviour == CompilerExceptionBehaviour.ShowExceptionMessage)
+                                System.Windows.Forms.MessageBox.Show(ce.ErrorText);
+                            continue;
+                        }
+                    }
 
                     // handle division by zero errors
                     if (ce.ErrorNumber == "CS0020")
@@ -553,8 +616,7 @@ namespace FastReport.Code
                         text.CanGrow = true;
                         text.FillColor = Color.Red;
                         text.Text = "DIVISION BY ZERO!";
-                        if (cr.Errors.Count == 1) // there are only division by zero errors, exception does't needed
-                            return true;
+                        continue;
                     }
                     else
                     {
@@ -569,14 +631,14 @@ namespace FastReport.Code
                 }
             }
 
-            if(additionalAssemblies.Count > 0)  // need recompile
+            if (additionalAssemblies.Count > 0)  // need recompile
                 return ReCompile(cp, cr, additionalAssemblies);
 
             return false;
         }
 
         /// <summary>
-        /// Returns true, if recompilation is successful
+        /// Returns true if recompilation is successful
         /// </summary>
         private bool ReCompile(CompilerParameters cp, CompilerResults cr, IList additionalAssemblies)
         {
@@ -609,12 +671,12 @@ namespace FastReport.Code
                 return null;
         }
 
-        public void InvokeEvent(string name, object[] parms)
+        public object InvokeMethod(string name, object[] parms)
         {
             if (String.IsNullOrEmpty(name))
-                return;
+                return null;
 
-            string exprName = "event_" + name;
+            string exprName = "method_" + name;
             if (!ContainsExpression(exprName))
             {
                 ExpressionDescriptor descriptor = new ExpressionDescriptor(this);
@@ -623,7 +685,7 @@ namespace FastReport.Code
             }
             try
             {
-                (Expressions[exprName] as ExpressionDescriptor).Invoke(parms);
+                return (Expressions[exprName] as ExpressionDescriptor).Invoke(parms);
             }
             catch (TargetInvocationException ex)
             {
@@ -646,7 +708,7 @@ namespace FastReport.Code
             }
             else
             {
-                string[] lines = scriptText.Substring(0, insertPos).Split(new char[] { '\r' });
+                string[] lines = scriptText.Substring(0, insertPos).Split('\r');
                 insertLine = lines.Length;
                 if (scriptText != Report.CodeHelper.EmptyScript())
                     needCompile = true;

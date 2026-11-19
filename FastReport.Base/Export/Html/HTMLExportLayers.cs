@@ -4,6 +4,7 @@ using System.IO;
 using FastReport.Table;
 using FastReport.Utils;
 using System.Windows.Forms;
+using FastReport.Export;
 
 namespace FastReport.Export.Html
 {
@@ -94,9 +95,10 @@ namespace FastReport.Export.Html
 
         private void ExportPageStylesLayers(FastString styles, int PageNumber)
         {
+            PrintPageStyle(styles);
             if (prevStyleListIndex < cssStyles.Count)
             {
-                styles.Append(HTMLGetStylesHeader());
+                styles.AppendLine(HTMLGetStylesHeader());
                 for (int i = prevStyleListIndex; i < cssStyles.Count; i++)
                     styles.Append(HTMLGetStyleHeader(i, PageNumber)).Append(cssStyles[i]).AppendLine("}");
                 styles.AppendLine(HTMLGetStylesFooter());
@@ -136,6 +138,7 @@ namespace FastReport.Export.Html
                     {
                         onclick = "text_edit";
                     }
+           
                 }
 
                 // we need to adjust left, top, width and height values because borders take up space in html elements
@@ -191,7 +194,7 @@ namespace FastReport.Export.Html
 
         private string EncodeURL(string value)
         {
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if CROSSPLATFORM || COREWIN
             return System.Net.WebUtility.UrlEncode(value);
 #else
             return ExportUtils.HtmlURL(value);
@@ -201,9 +204,13 @@ namespace FastReport.Export.Html
         private string GetHref(ReportComponentBase obj)
         {
             string href = String.Empty;
-            if (!String.IsNullOrEmpty(obj.Hyperlink.Value))
+
+            href = GetHrefAdvMatrixButton(obj, href);
+
+            if(!String.IsNullOrEmpty(obj.Hyperlink.Value))
             {
                 string hrefStyle = String.Empty;
+
                 if (obj is TextObject)
                 {
                     TextObject textObject = obj as TextObject;
@@ -212,6 +219,7 @@ namespace FastReport.Export.Html
                         !textObject.Font.Underline ? ";text-decoration:none" : String.Empty
                         );
                 }
+            
                 string url = EncodeURL(obj.Hyperlink.Value);
                 if (obj.Hyperlink.Kind == HyperlinkKind.URL)
                     href = String.Format("<a {0} href=\"{1}\"" + (obj.Hyperlink.OpenLinkInNewTab ? "target=\"_blank\"" : "") + ">", hrefStyle, obj.Hyperlink.Value);
@@ -267,10 +275,11 @@ namespace FastReport.Export.Html
                 style.Append("padding-left:").Append(Px((obj.Padding.Left) * Zoom));
             if (obj.Padding.Right != 0)
                 style.Append("padding-right:").Append(Px(obj.Padding.Right * Zoom));
-            if (top != 0)
-                style.Append("margin-top:").Append(Px(top * Zoom));
 
-            // we need to apply border width in order to position our div perfectly
+            if (top != 0)
+                    style.Append("margin-top:").Append(Px(top * Zoom));
+
+                // we need to apply border width in order to position our div perfectly
             float borderLeft;
             float borderRight;
             float borderTop;
@@ -328,27 +337,53 @@ namespace FastReport.Export.Html
                         IGraphics g = htmlMeasureGraphics;
                         using (Font f = new Font(obj.Font.FontFamily, obj.Font.Size * DrawUtils.ScreenDpiFX, obj.Font.Style))
                         {
-                            RectangleF textRect = new RectangleF(obj.AbsLeft, obj.AbsTop, obj.Width, obj.Height);
+                            RectangleF textRect = new RectangleF(obj.AbsLeft + obj.Padding.Left, obj.AbsTop + obj.Padding.Top,
+                                obj.Width - obj.Padding.Left - obj.Padding.Right,
+                                obj.Height - obj.Padding.Top - obj.Padding.Bottom);
                             StringFormat format = obj.GetStringFormat(Report.GraphicCache, 0);
                             Brush textBrush = Report.GraphicCache.GetBrush(obj.TextColor);
                             AdvancedTextRenderer renderer = new AdvancedTextRenderer(obj.Text, g, f, textBrush, null,
                                 textRect, format, obj.HorzAlign, obj.VertAlign, obj.LineHeight, obj.Angle, obj.FontWidthRatio,
                                 obj.ForceJustify, obj.Wysiwyg, obj.HasHtmlTags, false, Zoom, Zoom, obj.InlineImageCache);
                             if (renderer.Paragraphs.Count > 0)
+                            {
                                 if (renderer.Paragraphs[0].Lines.Count > 0)
                                 {
                                     float height = renderer.Paragraphs[0].Lines[0].CalcHeight();
                                     if (height > obj.Height)
                                         top = -(height - obj.Height) / 2;
                                     else
+                                    {
                                         top = renderer.Paragraphs[0].Lines[0].Top - obj.AbsTop;
+                                        height = renderer.CalcHeight();
+
+                                        if (obj.VertAlign == VertAlign.Center)
+                                        {
+                                            top = (obj.Height - height - obj.Padding.Bottom + obj.Padding.Top) / 2;
+
+                                            if(top < 0)
+                                            {
+                                                if(obj.Height > height)
+                                                top = (obj.Height - height - obj.Padding.Bottom + obj.Padding.Top) / 2;
+                                                else
+                                                top = (height - obj.Height - obj.Padding.Bottom + obj.Padding.Top) / 2;
+                                            }
+                                        }
+                                        else if (obj.VertAlign == VertAlign.Bottom)
+                                        {                                         
+                                            // (float)(Math.Round(obj.Font.Size * 96 / 72) / 2
+                                            // necessary to compensate for paragraph offset error in GetSpanText method below
+                                            top = obj.Height - height - obj.Padding.Bottom - (float)(Math.Round(obj.Font.Size * 96 / 72) / 2);
+                                        }
+                                    }
                                 }
+                            }
                         }
                     }
 
                     LayerBack(Page, obj,
                         GetSpanText(obj, ExportUtils.HtmlString(obj.Text, obj.TextRenderType, Px(Math.Round(obj.Font.Size * 96 / 72))),
-                        top + obj.Padding.Top,
+                        top,
                         obj.Width - obj.Padding.Horizontal,
                         obj.ParagraphOffset));
                     break;
@@ -359,6 +394,7 @@ namespace FastReport.Export.Html
         private FastString GetHtmlParagraph(HtmlTextRenderer renderer)
         {
             FastString sb = new FastString();
+
             foreach (HtmlTextRenderer.Paragraph paragraph in renderer.Paragraphs)
                 foreach (HtmlTextRenderer.Line line in paragraph.Lines)
                 {
@@ -382,6 +418,7 @@ namespace FastReport.Export.Html
                     else sb.Append("white-space:pre;");
                     sb.Append("\">");
                     HtmlTextRenderer.StyleDescriptor styleDesc = null;
+                    float prevWidth = 0;
                     foreach (HtmlTextRenderer.Word word in line.Words)
                     {
                         foreach (HtmlTextRenderer.Run run in word.Runs)
@@ -415,14 +452,22 @@ namespace FastReport.Export.Html
                                             sb.Append("&gt;");
                                             break;
                                         case '\t':
-                                            sb.Append("&Tab;");
+                                            if (word.Type == HtmlTextRenderer.WordType.Tab)
+                                            {
+                                                if(layers)
+                                                    sb.Append($"<span style=\"tab-size: {Math.Round(prevWidth + run.Width)}px;\">&Tab;</span>");
+                                                else
+                                                    sb.Append($"<span style=\"tab-size: {Math.Round(run.Left + run.Width)}px;\">&Tab;</span>");
+                                            }
+                                            else
+                                                sb.Append("&Tab;");
+
                                             break;
                                         default:
                                             sb.Append(ch);
                                             break;
                                     }
                                 }
-
                             }
                             else if (run is HtmlTextRenderer.RunImage)
                             {
@@ -449,6 +494,7 @@ namespace FastReport.Export.Html
                                 }
 
                             }
+                            prevWidth = run.Width;
                             //run.ToHtml(sb, true);
                         }
                     }
@@ -497,36 +543,48 @@ namespace FastReport.Export.Html
                     if (Math.Abs(Height) * Zoom < 1 && Zoom > 0)
                         Height = 1 / Zoom;
 
+                    int zoom = highQualitySVG ? 3 : 1;
+
                     using (System.Drawing.Image image =
                         new Bitmap(
-                            (int)(Math.Abs(Math.Round(Width * Zoom))),
-                            (int)(Math.Abs(Math.Round(Height * Zoom)))
-                            )
-                          )
+                            (int)(Math.Abs(Math.Round(Width * Zoom * zoom))),
+                            (int)(Math.Abs(Math.Round(Height * Zoom * zoom)))
+                            ))
                     {
                         using (Graphics g = Graphics.FromImage(image))
                         {
                             if (obj is TextObjectBase)
-                                g.Clear(Color.White);
+                                g.Clear(Color.Transparent);
 
                             float Left = Width > 0 ? obj.AbsLeft : obj.AbsLeft + Width;
                             float Top = Height > 0 ? obj.AbsTop : obj.AbsTop + Height;
 
                             float dx = 0;
                             float dy = 0;
-                            g.TranslateTransform((-Left - dx) * Zoom, (-Top - dy) * Zoom);
+                            g.TranslateTransform((-Left - dx) * Zoom * zoom, (-Top - dy) * Zoom * zoom);
 
                             BorderLines oldLines = obj.Border.Lines;
                             obj.Border.Lines = BorderLines.None;
-                            obj.Draw(new FRPaintEventArgs(g, Zoom, Zoom, Report.GraphicCache));
+                            obj.Draw(new FRPaintEventArgs(g, Zoom * zoom, Zoom * zoom, Report.GraphicCache));
                             obj.Border.Lines = oldLines;
-                     
                         }
+                        
+                        using (Bitmap b = new Bitmap(
+                        (int)(Math.Abs(Math.Round(Width * Zoom))),
+                        (int)(Math.Abs(Math.Round(Height * Zoom)))
+                        ))
+                        {
+                            using (Graphics gr = Graphics.FromImage(b))
+                            {
+                                gr.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                                gr.DrawImage(image, 0, 0, (int)Math.Abs(Width) * Zoom, (int)Math.Abs(Height) * Zoom);
+                            }
 
-                        if (FPictureFormat == System.Drawing.Imaging.ImageFormat.Jpeg)
-                            ExportUtils.SaveJpeg(image, PictureStream, 95);
-                        else
-                            image.Save(PictureStream, FPictureFormat);
+                            if (FPictureFormat == System.Drawing.Imaging.ImageFormat.Jpeg)
+                                ExportUtils.SaveJpeg(b, PictureStream, 95);
+                            else
+                                b.Save(PictureStream, FPictureFormat);
+                        }
                     }
                     PictureStream.Position = 0;
 
@@ -554,6 +612,7 @@ namespace FastReport.Export.Html
                                 }        
                             }   
 #else
+
                             hash = Crypter.ComputeHash(PictureStream);
                             PictureStream.Position = 0;
 #endif
@@ -667,7 +726,7 @@ namespace FastReport.Export.Html
                         TableCell textcell = table[j, i];
 
                         textcell.Left = x;
-                        textcell.Top = y;
+                        textcell.Top = y;                      
 
                         // custom draw
                         CustomDrawEventArgs e = new CustomDrawEventArgs();
@@ -679,6 +738,7 @@ namespace FastReport.Export.Html
                         e.top = hPos + textcell.AbsTop;
                         e.width = textcell.Width;
                         e.height = textcell.Height;
+                        
                         OnCustomDraw(e);
                         if (e.done)
                         {
@@ -793,6 +853,8 @@ namespace FastReport.Export.Html
                     SolidFill fill = reportPage.Fill as SolidFill;
                     htmlPage.Append(" background-color:").
                         Append(fill.IsTransparent ? "transparent" : ExportUtils.HTMLColor(fill.Color));
+                    if (exportMode == ExportType.WebPrint)
+                        htmlPage.Append("color-adjust: exact !important; print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important;");
                 }
                 else
                 {
@@ -829,11 +891,15 @@ namespace FastReport.Export.Html
             ExportHTMLPageFinal(css, htmlPage, d, maxWidth, maxHeight);
         }
 
-        private void ExportBandLayers(Base band)
+        private void ExportBandLayers(BandBase band)
         {
-            LayerBack(htmlPage, band as ReportComponentBase, null);
+            LayerBack(htmlPage, band, null);
             foreach (Base c in band.ForEachAllConvectedObjects(this))
             {
+
+            if(ExportMode == ExportType.WebPreview)
+                SetExportableAdvMatrix(c);
+
                 if (c is ReportComponentBase && (c as ReportComponentBase).Exportable)
                 {
                     ReportComponentBase obj = c as ReportComponentBase;
@@ -878,10 +944,11 @@ namespace FastReport.Export.Html
                                     tableback.Top = table.AbsTop;
                                     float tableWidth = 0;
                                     float tableHeight = 0;
+                                  
                                     for (int i = 0; i < table.ColumnCount; i++)
                                         tableWidth += table[i, 0].Width;
                                     for (int i = 0; i < table.RowCount; i++)
-                                        tableHeight += table.Rows[i].Height;
+                                        tableHeight += table.Rows[i].Height;                         
                                     tableback.Width = (tableWidth < table.Width) ? tableWidth : table.Width;
                                     tableback.Height = tableHeight;
                                     LayerText(htmlPage, tableback);

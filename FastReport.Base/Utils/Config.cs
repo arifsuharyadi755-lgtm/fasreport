@@ -16,12 +16,10 @@ namespace FastReport.Utils
     {
 #if COMMUNITY
         const string CONFIG_NAME = "FastReport.Community.config";
-#else
-#if MONO
+#elif MONO
         const string CONFIG_NAME = "FastReport.Mono.config";
 #else
         const string CONFIG_NAME = "FastReport.config";
-#endif
 #endif
         #region Private Fields
 
@@ -41,19 +39,17 @@ namespace FastReport.Utils
         private static bool FWebMode;
         private static bool preparedCompressed = true;
         private static bool disableHotkeys = false;
-        private static bool disableBacklight = false;
         private static bool enableScriptSecurity = false;
         private static ScriptSecurityProperties scriptSecurityProps = null;
         private static bool forbidLocalData = false;
         private static bool userSetsScriptSecurity = false;
-        private static FRPrivateFontCollection privateFontCollection = new FRPrivateFontCollection();
+        private static readonly FRPrivateFontCollection privateFontCollection = new FRPrivateFontCollection();
         internal static bool CleanupOnExit;
+        private static CompilerSettings compilerSettings = new CompilerSettings();
+        private static string applicationFolder;
+        private static readonly string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        private static bool disableLastFormatting = false;
 
-
-
-#if NETSTANDARD2_0 || NETSTANDARD2_1
-        private static readonly bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-#endif
 
         #endregion Private Fields
 
@@ -66,11 +62,8 @@ namespace FastReport.Utils
             get { return FIsRunningOnMono; }
         }
 
-#if NETSTANDARD2_0 || NETSTANDARD2_1
-        public static bool IsWindows
-        {
-            get { return isWindows; }
-        }
+#if CROSSPLATFORM
+        public static bool IsWindows { get; } = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 #endif
 
 
@@ -104,11 +97,20 @@ namespace FastReport.Utils
         }
 
         /// <summary>
-        /// Gets the application folder.
+        /// Gets or sets the application folder.
         /// </summary>
         public static string ApplicationFolder
         {
-            get { return AppDomain.CurrentDomain.BaseDirectory; }
+            get 
+            { 
+                if(applicationFolder == null)
+                    return baseDirectory;
+                return applicationFolder;
+            }
+            set 
+            {
+                applicationFolder = value;
+            }
         }
 
         /// <summary>
@@ -171,6 +173,15 @@ namespace FastReport.Utils
         {
             get { return disableHotkeys; }
             set { disableHotkeys =  value; }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating saving last formatting should be disabled.
+        /// </summary>
+        public static bool DisableLastFormatting
+        {
+            get { return disableLastFormatting; }
+            set { disableLastFormatting = value; }
         }
 
         /// <summary>
@@ -258,6 +269,16 @@ namespace FastReport.Utils
         {
             get { return scriptSecurityProps; }
         }
+
+        /// <summary>
+        /// Settings of report compiler.
+        /// </summary>
+        public static CompilerSettings CompilerSettings
+        {
+            get { return compilerSettings; }
+            set { compilerSettings = value; }
+        }
+
         #endregion Public Properties
 
         #region Internal Methods
@@ -277,10 +298,13 @@ namespace FastReport.Utils
         internal static void Init()
         {
             FIsRunningOnMono = Type.GetType("Mono.Runtime") != null;
+#if SKIA
+            Topten.RichTextKit.FontFallback.CharacterMatcher = characterMatcher;
+#endif
 
             CheckWebMode();
 
-#if !NETSTANDARD
+#if !CROSSPLATFORM
             if (!WebMode)
                 LoadConfig();
 #endif
@@ -372,9 +396,9 @@ namespace FastReport.Utils
         }
 #endif
 
-#endregion Internal Methods
+        #endregion Internal Methods
 
-#region Private Methods
+        #region Private Methods
 
         private static string GetTempFileName()
         {
@@ -404,6 +428,8 @@ namespace FastReport.Utils
             SaveUIStyle();
             SaveUIOptions();
             SavePreviewSettings();
+            SaveCompilerSettings();
+            SaveAuthServiceUser();
 #if !COMMUNITY
             SaveExportOptions();
 #endif
@@ -469,6 +495,8 @@ namespace FastReport.Utils
                 RestoreDefaultLanguage();
                 RestoreUIOptions();
                 RestorePreviewSettings();
+                RestoreAuthServiceUser();
+                RestoreCompilerSettings();
                 Res.LoadDefaultLocale();
                 AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
             }
@@ -495,7 +523,8 @@ namespace FastReport.Utils
 
                 try
                 {
-                    ProcessAssembly(Assembly.LoadFrom(pluginName));
+                    var assembly = Assembly.LoadFrom(pluginName);
+                    ProcessAssembly(assembly);
                 }
                 catch
                 {
@@ -503,29 +532,32 @@ namespace FastReport.Utils
             }
 
             // For CoreWin
-#if NETCOREAPP
+#if COREWIN
             LoadPluginsInCurrentFolder();
 #endif
         }
 
         private static void LoadPluginsInCurrentFolder()
         {
-            // find all plugin-connector in current directory
-            var plugins = Directory.GetFiles(ApplicationFolder, "FastReport.Data.*.dll");
-
-            // initialize
-            foreach(var pluginName in plugins)
+            var appFolder = ApplicationFolder;
+            if(!string.IsNullOrEmpty(appFolder))
             {
-                try
+                // find all plugin-connector in current directory
+                var plugins = Directory.GetFiles(appFolder, "FastReport.Data.*.dll");
+
+                // initialize
+                foreach (var pluginName in plugins)
                 {
-                    ProcessAssembly(Assembly.LoadFrom(pluginName));
-                }
-                catch
-                {
+                    try
+                    {
+                        var assembly = Assembly.LoadFrom(pluginName);
+                        ProcessAssembly(assembly);
+                    }
+                    catch
+                    {
+                    }
                 }
             }
-
-
         }
 
         private static void ProcessAssembly(Assembly a)
@@ -577,7 +609,7 @@ namespace FastReport.Utils
         /// </summary>
         public class ScriptSecurityProperties
         {
-            private readonly string[] defaultStopList = new[]
+            private static readonly string[] defaultStopList = new[]
                 {
                     "GetType",
                     "typeof", 
@@ -639,6 +671,7 @@ namespace FastReport.Utils
         {
             XmlItem xi = Root.FindItem("UIOptions");
             xi.SetProp("DisableHotkeys", Converter.ToString(DisableHotkeys));
+            xi.SetProp("DisableLastFormatting", Converter.ToString(DisableLastFormatting));
         }
 
         private static void RestoreUIOptions()
@@ -646,10 +679,45 @@ namespace FastReport.Utils
             RestoreRightToLeft();
 
             XmlItem xi = Root.FindItem("UIOptions");
+
             string disableHotkeysStringValue = xi.GetProp("DisableHotkeys");
             if (!String.IsNullOrEmpty(disableHotkeysStringValue))
             {
                 disableHotkeys = disableHotkeysStringValue.ToLower() != "false";
+            }
+
+            string disableLastFormattingStringValue = xi.GetProp("DisableLastFormatting");
+            if (!String.IsNullOrEmpty(disableLastFormattingStringValue))
+            {
+                disableLastFormatting = disableLastFormattingStringValue.ToLower() != "false";
+            }
+        }
+
+        private static void SaveCompilerSettings()
+        {
+            XmlItem xi = Root.FindItem("CompilerSettings");
+            xi.SetProp("Placeholder", CompilerSettings.Placeholder);
+            xi.SetProp("ExceptionBehaviour", Converter.ToString(CompilerSettings.ExceptionBehaviour));
+        }
+
+        private static void RestoreCompilerSettings()
+        {
+            XmlItem xi = Root.FindItem("CompilerSettings");
+            CompilerSettings.Placeholder = xi.GetProp("Placeholder");
+
+            string exceptionBehaviour = xi.GetProp("ExceptionBehaviour");
+            if (!String.IsNullOrEmpty(exceptionBehaviour))
+            {
+                try
+                {
+                    CompilerSettings.ExceptionBehaviour =
+                        (CompilerExceptionBehaviour)Converter.FromString(typeof(CompilerExceptionBehaviour),
+                        exceptionBehaviour);
+                }
+                catch
+                {
+                    CompilerSettings.ExceptionBehaviour = CompilerExceptionBehaviour.Default;
+                }
             }
         }
 

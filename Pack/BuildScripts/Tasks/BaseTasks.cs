@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using static CakeScript.Startup;
 using static CakeScript.CakeAPI;
+using Cake.Common.Tools.DotNet.MSBuild;
 
 namespace CakeScript
 {
@@ -13,6 +14,7 @@ namespace CakeScript
         bool IsRelease = false;
         bool IsProfessional = false;
         bool IsDebug = false;
+        bool IsTest = false;
 
         string config = Argument("config", "Debug");
         string solutionDirectory = Argument("solution-directory", "");
@@ -34,7 +36,14 @@ namespace CakeScript
           "SQLite",
           "ClickHouse",
           "Firebird",
+          "Excel",
+          "Cassandra"
         };
+
+        internal string SolutionFile => Path.Combine(solutionDirectory, solutionFilename);
+
+        string PackDir => Path.Combine(solutionDirectory, "Pack");
+
 
         public Program(string[] args)
         {
@@ -47,6 +56,7 @@ namespace CakeScript
             IsDemo = config.ToLower() == "demo";
             IsRelease = config.ToLower() == "release";
             IsProfessional = config.ToLower() == "professional";
+            IsTest = config.ToLower() == "test";
 
             Information($"CONFIG: {config}");
         }
@@ -79,7 +89,7 @@ namespace CakeScript
             if (String.IsNullOrWhiteSpace(solutionDirectory))
                 throw new FileNotFoundException($"File `{solutionFilename}` was not found!");
             solutionDirectory = Path.GetFullPath(solutionDirectory);
-            if (!solutionDirectory.EndsWith(Path.DirectorySeparatorChar.ToString()))
+            if (!solutionDirectory.EndsWith(Path.DirectorySeparatorChar))
                 solutionDirectory += Path.DirectorySeparatorChar.ToString();
 
             Information($"solutionDirectory: {solutionDirectory}");
@@ -91,17 +101,30 @@ namespace CakeScript
         {
             if (String.IsNullOrWhiteSpace(outdir))
             {
-                outdir = Path.Combine(solutionDirectory, "..", "fr_nuget");
+                outdir = Path.Combine(solutionDirectory, "fr_nuget");
             }
             else if (!Path.IsPathRooted(outdir))
             {
-                outdir = Path.Combine(solutionDirectory, "..", outdir);
+                outdir = Path.Combine(solutionDirectory, outdir);
             }
 
             if (!Directory.Exists(outdir))
                 Directory.CreateDirectory(outdir);
 
             Information($"outdir: {outdir}");
+        }
+
+        [DependsOn(nameof(Prepare))]
+        public void Clean()
+        {
+            string solutionFile = SolutionFile;
+            DotNetMSBuild(solutionFile, new DotNetMSBuildSettings()
+              .SetConfiguration(config)
+              .WithTarget("CleanObjAndBin")
+              .WithProperty("SolutionDir", solutionDirectory)
+              .WithProperty("SolutionFileName", solutionFilename));
+
+            DotNetClean(solutionFile);
         }
 
         public static void Default()
@@ -116,9 +139,18 @@ namespace CakeScript
             Information("|>  --vers= - change version");
             Information("|>  --solution-directory= - change solution directory");
             Information("|>  --solution-filename= - change solution file name");
+            Information("|>  --out-dir= - change output dir for packages");
             Information("");
             Information("OR: if you want to run 'Debug' mode, please add [Debug] attribute to your method");
 
+        }
+
+        internal string GetVersion()
+        {
+            string versionNum = version + "-" + config.ToLower();
+            if (IsRelease)
+                versionNum = version;
+            return versionNum;
         }
     }
 }

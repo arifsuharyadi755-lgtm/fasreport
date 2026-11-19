@@ -193,7 +193,6 @@ namespace FastReport
             base.SaveState();
             SetRunning(true);
             SetDesigning(false);
-            OnBeforePrint(EventArgs.Empty);
 
             foreach (ReportComponentBase obj in Objects)
             {
@@ -207,7 +206,6 @@ namespace FastReport
         /// <inheritdoc/>
         public override void RestoreState()
         {
-            OnAfterPrint(EventArgs.Empty);
             base.RestoreState();
             SetRunning(false);
 
@@ -233,7 +231,6 @@ namespace FastReport
                     (obj as BreakableComponent).BreakTo.GetType() == obj.GetType())
                     (obj as BreakableComponent).Break((obj as BreakableComponent).BreakTo);
             }
-            OnAfterData();
         }
 
         /// <inheritdoc/>
@@ -311,7 +308,7 @@ namespace FastReport
             // perform grow to bottom
             foreach (ReportComponentBase obj in Objects)
             {
-                if (obj.GrowToBottom)
+                if (obj.GrowToBottom || obj.Bottom > Height)
                     obj.Height = Height - obj.Top;
             }
 

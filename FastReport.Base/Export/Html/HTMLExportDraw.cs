@@ -22,8 +22,6 @@ namespace FastReport.Export.Html
             FFontDesc.Append("font-size:").Append(Px(Math.Round(font.Size * 96 / 72)));
             if (LineHeight > 0)
                 FFontDesc.Append("line-height:").Append(Px(LineHeight)).Append(";");
-            else
-                FFontDesc.Append("line-height: 1.2;");
         }
 
         private void HTMLPadding(FastString PaddingDesc, Padding padding, float ParagraphOffset)
@@ -67,9 +65,12 @@ namespace FastReport.Export.Html
             float width;
             if (line.Style == LineStyle.Double)
                 width = line.Width * 3 * Zoom;
-            else
+            else if (layers)
                 width = line.Width * Zoom;
-            return Convert.ToString(Math.Round(width, 2), numberFormat) + "px;";
+            else
+                width = line.Width;
+
+            return ExportUtils.FloatToString(width) + "px;";
         }
 
         private void HTMLBorder(FastString BorderDesc, Border border)
@@ -178,23 +179,25 @@ namespace FastReport.Export.Html
 
         private string HTMLGetStylesHeader()
         {
-            FastString header = new FastString();
+            return "<style type=\"text/css\"><!-- ";
+        }
+
+        private void PrintPageStyle(FastString sb)
+        {
             if (singlePage && pageBreaks)
             {
-                header.AppendLine("<style type=\"text/css\" media=\"print\"><!--");
-                header.Append("div." + pageStyleName + 
-                    " { page-break-after: always; page-break-inside: avoid; ");
-                if (d.page.Landscape)
+                sb.AppendLine("<style type=\"text/css\" media=\"print\"><!--");
+                sb.Append("div.").Append(pageStyleName)
+                    .Append(" { page-break-after: always; page-break-inside: avoid; ");
+                if (d.page.Landscape && !NotRotateLandscapePage)
                 {
-                    header.Append("width:").Append(Px(maxHeight * Zoom).Replace(";", " !important;"))
+                    sb.Append("width:").Append(Px(maxHeight * Zoom).Replace(";", " !important;"))
                           .Append("transform: rotate(90deg); -webkit-transform: rotate(90deg)");
                 }
 
-                header.AppendLine("}")
+                sb.AppendLine("}")
                       .AppendLine("--></style>");
             }
-            header.AppendLine("<style type=\"text/css\"><!-- ");
-            return header.ToString();
         }
 
         private string HTMLGetStyleHeader(long index, long subindex)

@@ -101,6 +101,7 @@
     </Shapes>
     <PictureObject Text="Зображення"/>
     <TableObject Text="Таблиця"/>
+    <Matrix Text="Матриця"/>
     <MatrixObject Text="Матриця"/>
     <SubreportObject Text="Вкладений звіт"/>
     <BarcodeObject Text="Штрих-код"/>
@@ -1344,7 +1345,7 @@
       <InsertToRight Text="Вставити колонку праворуч"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Об'єднати клітинки"/>
+      <Merge Text="Об'єднати клітинки"/>
       <Split Text="Розділити клітинку"/>
     </TableCell>
     <MatrixObject>

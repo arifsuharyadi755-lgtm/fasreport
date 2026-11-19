@@ -101,6 +101,7 @@
     </Shapes>
     <PictureObject Text="Billede"/>
     <TableObject Text="Tabel"/>
+    <Matrix Text="Krydstabel"/>
     <MatrixObject Text="Krydstabel"/>
     <SubreportObject Text="Subreport"/>
     <BarcodeObject Text="Stregkode"/>
@@ -1345,7 +1346,7 @@
       <InsertToRight Text="Indsæt kolonne til højre"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Sammensæt celler"/>
+      <Merge Text="Sammensæt celler"/>
       <Split Text="Split celler"/>
     </TableCell>
     <MatrixObject>

@@ -51,7 +51,7 @@ namespace FastReport.Web
         /// </summary>
         public Report Report
         {
-            get => Tabs[CurrentTabIndex].Report;
+            get => Tabs[CurrentTabIndex].Report; 
             set => Tabs[CurrentTabIndex].Report = value;
         }
 
@@ -69,33 +69,8 @@ namespace FastReport.Web
             }
         }
 
-        internal WebRes Res { get; set; } = new WebRes();
+        internal IWebRes Res { get; set; } = new WebRes();
 
-
-        /// <summary>
-        /// Active report tab
-        /// </summary>
-        public ReportTab CurrentTab
-        {
-            get => Tabs[CurrentTabIndex];
-            set => Tabs[CurrentTabIndex] = value;
-        }
-
-        /// <summary>
-        /// Active tab index
-        /// </summary>
-        public int CurrentTabIndex
-        {
-            get
-            {
-                if (currentTabIndex >= Tabs.Count)
-                    currentTabIndex = Tabs.Count - 1;
-                if (currentTabIndex < 0)
-                    currentTabIndex = 0;
-                return currentTabIndex;
-            }
-            set => currentTabIndex = value;
-        }
 
         /// <summary>
         /// Page index of current report
@@ -131,11 +106,6 @@ namespace FastReport.Web
         public int TotalPages => Report?.PreparedPages?.Count ?? 0;
 
         /// <summary>
-        /// List of report tabs
-        /// </summary>
-        public ReportTabCollection Tabs { get; } = new ReportTabCollection() { new ReportTab() { Report = new Report(), Closeable = false } };
-
-        /// <summary>
         /// Switches beetwen Preview and Designer modes
         /// </summary>
         public WebReportMode Mode { get; set; } = WebReportMode.Preview;
@@ -152,7 +122,6 @@ namespace FastReport.Web
         public string Height { get; set; } = "";
         public bool Pictures { get; set; } = true;
         public bool EmbedPictures { get; set; } = false;
-
 
         #region ToolbarSettings
 
@@ -191,11 +160,16 @@ namespace FastReport.Web
 #endif
 
         [Obsolete("Please, use Toolbar.Position")]
-      
         public bool ShowBottomToolbar { get => Toolbar.ShowBottomToolbar; set => Toolbar.ShowBottomToolbar = value; }
 
-
+        [Obsolete("Please, use Toolbar.Color")]
         public Color ToolbarColor { get => Toolbar.Color; set => Toolbar.Color = value; }
+
+        /// <summary>
+        /// Toolbar height in pixels
+        /// </summary>
+        [Obsolete("Please, use Toolbar.Height")]
+        public int ToolbarHeight { get => Toolbar.Height; set => Toolbar.Height = value; }
 
         #endregion
 
@@ -223,14 +197,8 @@ namespace FastReport.Web
         private string ReportPath { get; set; } = null;
         private string ReportResourceString { get; set; } = null;
 
-        /// <summary>
-        /// Toolbar height in pixels
-        /// </summary>
-        public int ToolbarHeight { get; set; } = 40;
-
         internal readonly Dictionary<string, byte[]> PictureCache = new Dictionary<string, byte[]>();
-        int currentTabIndex;
-
+        
 #endregion
 
         public WebReport()
@@ -265,13 +233,11 @@ namespace FastReport.Web
         public void LoadPrepared(string filename)
         {
             Report.LoadPrepared(filename);
-            ReportPrepared = true;
         }
 
         public void LoadPrepared(Stream stream)
         {
             Report.LoadPrepared(stream);
-            ReportPrepared = true;
         }
 
         internal HtmlString Render(bool renderBody)
@@ -311,8 +277,24 @@ namespace FastReport.Web
         /// </summary>
         public void NextPage()
         {
-            if (CurrentPageIndex < TotalPages - 1)
-                CurrentPageIndex++;
+            if (CurrentPageIndex >= TotalPages - 1)
+                return;
+
+            var curPageIndex = CurrentPageIndex + 1;
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                if (curPageIndex == Tabs[numberNextTab].MinPageIndex)
+                {
+                    CurrentTabIndex++;
+
+                    if (numberNextTab < Tabs.Count - 1)
+                    {
+                        numberNextTab++;
+                    }
+                }
+            }
+
+            CurrentPageIndex = curPageIndex;
         }
 
         /// <summary>
@@ -320,8 +302,24 @@ namespace FastReport.Web
         /// </summary>
         public void PrevPage()
         {
-            if (CurrentPageIndex > 0)
-                CurrentPageIndex--;
+            if (CurrentPageIndex <= 0)
+                return;
+
+            var curPageIndex = CurrentPageIndex - 1;
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                if (CurrentTab.MinPageIndex > curPageIndex)
+                {
+                    if (numberNextTab != 1 && CurrentTabIndex != numberNextTab)
+                    {
+                        numberNextTab--;
+                    }
+
+                    CurrentTabIndex--;
+                }
+            }
+
+            CurrentPageIndex = curPageIndex;
         }
 
         /// <summary>
@@ -329,6 +327,12 @@ namespace FastReport.Web
         /// </summary>
         public void FirstPage()
         {
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                numberNextTab = 1;
+                CurrentTabIndex = 0;
+            }
+
             CurrentPageIndex = 0;
         }
 
@@ -337,6 +341,12 @@ namespace FastReport.Web
         /// </summary>
         public void LastPage()
         {
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                numberNextTab = Tabs.Count - 1;
+                CurrentTabIndex = Tabs.Count - 1;
+            }
+
             CurrentPageIndex = TotalPages - 1;
         }
 
@@ -345,13 +355,30 @@ namespace FastReport.Web
         /// </summary>
         public void GotoPage(int value)
         {
-            if (value >= 0 && value < TotalPages)
-                CurrentPageIndex = value;
+            if (value < 0 || value >= TotalPages)
+                return;
+
+            if (SplitReportPagesInTabs && Tabs.Count > 1)
+            {
+                for(int i = 0; i < Tabs.Count; i++)
+                {
+                    // can be better
+                    if (Tabs[i].MinPageIndex <= value)
+                    {
+                        CurrentTabIndex = i;
+                        if (i != Tabs.Count - 1)
+                            numberNextTab = i + 1;
+                    }
+                    else break;
+                }
+            }
+
+            CurrentPageIndex = value;
         }
 
-#endregion
+        #endregion
 
-#region Script Security
+        #region Script Security
 
         private static ScriptSecurity ScriptSecurity = null;
 

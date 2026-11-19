@@ -97,6 +97,7 @@
     </Shapes>
     <PictureObject Text="Resim"/>
     <TableObject Text="Tablo"/>
+    <Matrix Text="Matrix"/>
     <MatrixObject Text="Matrix"/>
     <SubreportObject Text="Alt Rapor"/>
     <BarcodeObject Text="Barkod"/>
@@ -1323,7 +1324,7 @@
       <InsertToRight Text="Sağa Ekle"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Birleştir"/>
+      <Merge Text="Birleştir"/>
       <Split Text="Ayraç"/>
     </TableCell>
     <MatrixObject>

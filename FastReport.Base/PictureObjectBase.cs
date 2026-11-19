@@ -376,7 +376,7 @@ namespace FastReport
             PictureObjectBase src = source as PictureObjectBase;
             if (src != null)
             {
-                ImageLocation = src.ImageLocation;
+                imageLocation = src.ImageLocation;
                 DataColumn = src.DataColumn;
                 ImageSourceExpression = src.ImageSourceExpression;
                 Padding = src.Padding;
@@ -820,7 +820,7 @@ namespace FastReport
             {
                 if (ImageWidth == 0 || ImageHeight == 0)
                 {
-                    if (IsRunning)
+                    if (IsRunning && !IsPrinting)
                     {
                         Width = 0;
                         Height = 0;

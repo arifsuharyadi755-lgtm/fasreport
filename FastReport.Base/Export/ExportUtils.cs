@@ -53,12 +53,11 @@ namespace FastReport.Export
                 return page.PaperHeight;
         }
 
-        public static string FloatToString(double value)
+
+        private static readonly NumberFormatInfo _provider;
+        public static string FloatToString(double value, int digits = 2)
         {
-            NumberFormatInfo provider = new NumberFormatInfo();
-            provider.NumberGroupSeparator = String.Empty;
-            provider.NumberDecimalSeparator = ".";
-            return Convert.ToString(Math.Round(value, 2), provider);
+            return Convert.ToString(Math.Round(value, digits), _provider);
         }
 
         internal static bool ParseTextToDecimal(string text, FormatBase format, out decimal value)
@@ -99,11 +98,19 @@ namespace FastReport.Export
             return false;
         }
 
-        internal static string GetExcelFormatSpecifier(FormatBase format)
+        internal static string GetExcelFormatSpecifier(FormatBase format, bool useLocale = false, bool currencyToAccounting = false)
         {
             if (format is CurrencyFormat)
             {
                 NumberFormatInfo f = (format as CurrencyFormat).GetNumberFormatInfo();
+
+                if (useLocale)
+                {
+                    (format as CurrencyFormat).UseLocale = true;
+                    f = (format as CurrencyFormat).GetNumberFormatInfo();
+                    f.CurrencyDecimalDigits = CultureInfo.CurrentCulture.NumberFormat.CurrencyDecimalDigits;
+                }
+
                 string fm_str = "#,##0";
                 if (f.CurrencyDecimalDigits > 0)
                 {
@@ -117,37 +124,90 @@ namespace FastReport.Export
 
                 switch (f.CurrencyPositivePattern)
                 {
-                    case 0: positive_pattern = currency_symbol + fm_str; break;   //   $n 
-                    case 1: positive_pattern = fm_str + currency_symbol; break;  //   n$
-                    case 2: positive_pattern = currency_symbol + " " + fm_str; break;  //   $ n
-                    case 3: positive_pattern = fm_str + " " + currency_symbol; break;  //   n $
+                    case 0: positive_pattern = currency_symbol + fm_str; break;       // $n 
+                    case 1: positive_pattern = fm_str + currency_symbol; break;       // n$
+                    case 2: positive_pattern = currency_symbol + " " + fm_str; break; // $ n
+                    case 3: positive_pattern = fm_str + " " + currency_symbol; break; // n $
                 }
 
                 switch (f.CurrencyNegativePattern)
                 {
-                    case 0: negative_pattern = "(" + currency_symbol + fm_str + ")"; break; // ($n)
-                    case 1: negative_pattern = "-" + currency_symbol + fm_str; break; // -$n
-                    case 2: negative_pattern = currency_symbol + "-" + fm_str; break; // $-n
-                    case 3: negative_pattern = currency_symbol + fm_str + "-"; break; // $n-
-                    case 4: negative_pattern = "(" + currency_symbol + fm_str + ")"; break; // (n$)
-                    case 5: negative_pattern = "-" + fm_str + currency_symbol; break; // -n$
-                    case 6: negative_pattern = fm_str + "-" + currency_symbol; break; // n-$
-                    case 7: negative_pattern = fm_str + currency_symbol + "-"; break; // n$-
-                    case 8: negative_pattern = "-" + fm_str + " " + currency_symbol; break; // -n $
-                    case 9: negative_pattern = "-" + currency_symbol + " " + fm_str; break; // -$ n
-                    case 10: negative_pattern = fm_str + " " + currency_symbol + "-"; break; // n $-
-                    case 11: negative_pattern = currency_symbol + " " + fm_str + "-"; break; // $ n-
-                    case 12: negative_pattern = currency_symbol + " -" + fm_str; break; // $ -n
-                    case 13: negative_pattern = fm_str + "- " + currency_symbol; break; // n- $
+                    case 0: negative_pattern = "(" + currency_symbol + fm_str + ")"; break;        // ($n)
+                    case 1: negative_pattern = "-" + currency_symbol + fm_str; break;              // -$n
+                    case 2: negative_pattern = currency_symbol + "-" + fm_str; break;              // $-n
+                    case 3: negative_pattern = currency_symbol + fm_str + "-"; break;              // $n-
+                    case 4: negative_pattern = "(" + currency_symbol + fm_str + ")"; break;        // (n$)
+                    case 5: negative_pattern = "-" + fm_str + currency_symbol; break;              // -n$
+                    case 6: negative_pattern = fm_str + "-" + currency_symbol; break;              // n-$
+                    case 7: negative_pattern = fm_str + currency_symbol + "-"; break;              // n$-
+                    case 8: negative_pattern = "-" + fm_str + " " + currency_symbol; break;        // -n $
+                    case 9: negative_pattern = "-" + currency_symbol + " " + fm_str; break;        // -$ n
+                    case 10: negative_pattern = fm_str + " " + currency_symbol + "-"; break;       // n $-
+                    case 11: negative_pattern = currency_symbol + " " + fm_str + "-"; break;       // $ n-
+                    case 12: negative_pattern = currency_symbol + " -" + fm_str; break;            // $ -n
+                    case 13: negative_pattern = fm_str + "- " + currency_symbol; break;            // n- $
                     case 14: negative_pattern = "(" + currency_symbol + " " + fm_str + ")"; break; // ($ n)
                     case 15: negative_pattern = "(" + fm_str + " " + currency_symbol + ")"; break; // (n $)
                 }
 
+                if (currencyToAccounting)
+                {
+                    string financeSymbol = "";
+
+                    switch (f.CurrencySymbol)
+                    {
+                        case "₽":       financeSymbol = "[$₽-419]"; break;
+                        case "$":       financeSymbol = "[$$-409]"; break;
+                        case "\u20AC":  financeSymbol = "[$€-2]"; break;
+                        case "\u00A3":  financeSymbol = "[$£-809]"; break;
+                        case "\u20B9":  financeSymbol = "[$₹-4009]"; break;
+                    }
+
+                    switch (f.CurrencyPositivePattern)
+                    {
+                        case 0: positive_pattern = @"_-* " + financeSymbol + fm_str + "_-;"; break;       // $n 
+                        case 1: positive_pattern = @"_-* " + fm_str + financeSymbol + "_-;"; break;       // n$
+                        case 2: positive_pattern = @"_-* " + financeSymbol + " " + fm_str + "_-;"; break; // $ n
+                        case 3: positive_pattern = @"_-* " + fm_str + " "+ financeSymbol + "_-;"; break;  // n $
+                    }
+
+                    switch (f.CurrencyNegativePattern)
+                    {
+                        case 0: negative_pattern = @"_-* " + "(" + financeSymbol + fm_str + ")" + "_-;"; break;        // ($n)
+                        case 1: negative_pattern = @"_-* " + "-" + financeSymbol + fm_str + "_-;"; break;              // -$n
+                        case 2: negative_pattern = @"_-* " + financeSymbol + "-" + fm_str + "_-;"; break;              // $-n
+                        case 3: negative_pattern = @"_-* " + financeSymbol + fm_str + "-" + "_-;"; break;              // $n-
+                        case 4: negative_pattern = @"_-* " + "(" + fm_str + financeSymbol + ")" + "_-;"; break;        // (n$)
+                        case 5: negative_pattern = @"_-* " + "-" + fm_str + financeSymbol + "_-;"; break;              // -n$
+                        case 6: negative_pattern = @"_-* " + fm_str + "-" + financeSymbol + "_-;"; break;              // n-$
+                        case 7: negative_pattern = @"_-* " + fm_str + financeSymbol + "-" + "_-;"; break;              // n$-
+                        case 8: negative_pattern = @"_-* " + "-" + fm_str + " " + financeSymbol + "_-;"; break;        // -n $
+                        case 9: negative_pattern = @"_-* " + "-" + financeSymbol + " " + fm_str + "_-;"; break;        // -$ n
+                        case 10: negative_pattern = @"_-* " + fm_str + " " + financeSymbol + "-" + "_-;"; break;       // n $-
+                        case 11: negative_pattern = @"_-* " + financeSymbol + " " + fm_str + "-" + "_-;"; break;       // $ n-
+                        case 12: negative_pattern = @"_-* " + financeSymbol + " " + "-" + fm_str + "_-;"; break;       // $ -n
+                        case 13: negative_pattern = @"_-* " + fm_str + "- " + financeSymbol + "_-;"; break;            // n- $
+                        case 14: negative_pattern = @"_-* " + "(" + financeSymbol + " " + fm_str + ")" + "_-;"; break; // ($ n)
+                        case 15: negative_pattern = @"_-* " + "(" + fm_str + " " + financeSymbol + ")" + "_-;"; break; // (n $)
+                    }
+
+                    string financeFormat_Options = @"_-* &quot;-&quot;??\ " + financeSymbol + "_-;_-@_-";
+
+                    return positive_pattern + negative_pattern + financeFormat_Options;
+                }
                 return positive_pattern + ";" + negative_pattern;
             }
             else if (format is NumberFormat)
             {
                 NumberFormatInfo f = (format as NumberFormat).GetNumberFormatInfo();
+
+                if (useLocale)
+                {
+                    (format as NumberFormat).UseLocale = true;
+                    f = (format as NumberFormat).GetNumberFormatInfo();
+                    f.CurrencyDecimalDigits = CultureInfo.CurrentCulture.NumberFormat.NumberDecimalDigits;
+                }
+
                 string fm_str = "#,##0";
                 if (f.NumberDecimalDigits > 0)
                 {
@@ -162,10 +222,10 @@ namespace FastReport.Export
                 switch (f.NumberNegativePattern)
                 {
                     case 0: negative_pattern = "(" + fm_str + ")"; break; // (n)
-                    case 1: negative_pattern = "-" + fm_str; break; // -n
-                    case 2: negative_pattern = "- " + fm_str; break; // - n
-                    case 3: negative_pattern = fm_str + "-"; break; // n-
-                    case 4: negative_pattern = fm_str + " -"; break; // n -
+                    case 1: negative_pattern = "-" + fm_str; break;       // -n
+                    case 2: negative_pattern = "- " + fm_str; break;      // - n
+                    case 3: negative_pattern = fm_str + "-"; break;       // n-
+                    case 4: negative_pattern = fm_str + " -"; break;      // n -
                 }
 
                 return positive_pattern + ";" + negative_pattern;
@@ -186,6 +246,13 @@ namespace FastReport.Export
             else if (format is PercentFormat)
             {
                 string pattern = "0";
+
+                if (useLocale)
+                {
+                    (format as PercentFormat).UseLocale = true;
+                    (format as PercentFormat).DecimalDigits = CultureInfo.CurrentCulture.NumberFormat.PercentDecimalDigits;
+                }
+
                 if ((format as PercentFormat).DecimalDigits > 0)
                 {
                     pattern += ".";
@@ -200,11 +267,7 @@ namespace FastReport.Export
 
         internal static string HTMLColor(Color color)
         {
-#if DOTNET_4
             return ColorTranslator.ToHtml(color);
-#else
-            return HTMLColorCode(color);
-#endif
         }
 
         internal static string HTMLColorCode(Color color)
@@ -254,8 +317,8 @@ namespace FastReport.Export
 
             if (textRenderType == TextRenderType.HtmlTags)
             {
-                string wingdings = "<font face=\"Wingdings\">";
-                string webdings = "<font face=\"Webdings\">";
+                const string wingdings = "<font face=\"Wingdings\">";
+                const string webdings = "<font face=\"Webdings\">";
                 int ind1 = 0, ind2 = 0;
                 if (text.Contains(wingdings))
                 {
@@ -482,7 +545,7 @@ namespace FastReport.Export
             long adler = 1L;
             using (DeflateStream compressor = new DeflateStream(dst, CompressionMode.Compress, true))
             {
-                int bufflength = 2048;
+                const int bufflength = 2048;
                 byte[] buff = new byte[bufflength];
                 int i;
                 while ((i = src.Read(buff, 0, bufflength)) > 0)
@@ -695,10 +758,44 @@ namespace FastReport.Export
             return cellReference.ToString();
         }
 
-        private static CultureInfo INVARIANT_CULTURE = CultureInfo.InvariantCulture;
+        private static readonly CultureInfo INVARIANT_CULTURE = CultureInfo.InvariantCulture;
         internal static string StringFormat(string formatString, params object[] objects)
         {
             return String.Format(INVARIANT_CULTURE, formatString, objects);
+        }
+
+        /// <summary>
+        /// Convert index to Excel column name.
+        /// </summary>
+        /// <param name="index"> Index of column</param>
+        /// <returns> Column name</returns>
+        public static string IndexToName(int index)
+        {
+
+            bool firstSymbol = false;
+            string result = "";
+
+            for (; index > 0; index /= 26)
+            {
+                if (index < 26 && result != "")
+                    firstSymbol = true;
+
+                var x = index % 26;
+                result = (char)(x + 'A' + (firstSymbol ? -1 : 0)) + result;
+            }
+
+            if (result == "")
+                result = "A";
+
+            return result;
+        }
+
+        static ExportUtils()
+        {
+            var defaultProvider  = new NumberFormatInfo();
+            defaultProvider.NumberGroupSeparator = string.Empty;
+            defaultProvider.NumberDecimalSeparator = ".";
+            _provider = NumberFormatInfo.ReadOnly(defaultProvider);
         }
     }
 }

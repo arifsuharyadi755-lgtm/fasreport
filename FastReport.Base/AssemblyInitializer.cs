@@ -50,7 +50,6 @@ namespace FastReport
             //RegisteredObjects.Add(typeof(Data.JsonConnection.JsonObjectDataSource), "", 0);
             //RegisteredObjects.Add(typeof(Data.JsonConnection.JsonArrayDataSource), "", 0);
             RegisteredObjects.InternalAddConnection(typeof(Data.JsonConnection.JsonDataSourceConnection));
-            RegisteredObjects.InternalAddConnection(typeof(Data.ElasticSearch.ESDataSourceConnection));
             // formats
             RegisteredObjects.InternalAdd(typeof(BooleanFormat), "", 0);
             RegisteredObjects.InternalAdd(typeof(CurrencyFormat), "", 0);
@@ -106,11 +105,15 @@ namespace FastReport
             RegisteredObjects.InternalAdd(typeof(TableColumn), "", 215);
             RegisteredObjects.InternalAdd(typeof(TableRow), "", 216);
             RegisteredObjects.InternalAdd(typeof(TableCell), "", 214);
-            RegisteredObjects.InternalAdd(typeof(MatrixObject), "ReportPage", 142, 7);
 
 #if !COMMUNITY
-            RegisteredObjects.InternalAdd(typeof(CrossViewObject), "ReportPage", 247, 8);
+            RegisteredObjects.AddCategory("ReportPage,Matrix", 142, 7, "Objects,Matrix");
+            RegisteredObjects.InternalAdd(typeof(MatrixObject), "ReportPage,Matrix", 142, 1);
+            RegisteredObjects.InternalAdd(typeof(CrossViewObject), "ReportPage,Matrix", 247, 2);
+#else
+            RegisteredObjects.InternalAdd(typeof(MatrixObject), "ReportPage", 142, 7);
 #endif
+
 
             RegisteredObjects.AddCategory("ReportPage,Barcodes", 123, 9, "Objects,BarcodeObject");
             for (int i = 0; i <= Barcodes.Items.Length - 1; i++)
@@ -132,9 +135,7 @@ namespace FastReport
             RegisteredObjects.InternalAddExport(typeof(ImageExport), "Image", "Export,Image,File");
 
             // functions
-            RegisteredObjects.AddCategory("Functions", -1, "");
             StdFunctions.Register();
-
 
         }
     }

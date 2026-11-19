@@ -74,7 +74,7 @@ namespace FastReport.Utils
           return type.FullName;
         return type.AssemblyQualifiedName;
       }
-#if true// | NETSTANDARD2_0 || NETSTANDARD2_1
+#if true// | CROSSPLATFORM
             if (value is Font)
             {
                 return new TypeConverters.FontConverter().ConvertToInvariantString(value);
@@ -130,9 +130,9 @@ namespace FastReport.Utils
       if (type == typeof(string[]))
       {
         value = value.Replace("\r\n", "\r");
-        return value.Split(new char[] { '\r' });
+        return value.Split('\r');
       }
-#if true //NETSTANDARD2_0 || NETSTANDARD2_1
+#if true //CROSSPLATFORM
             if (type == typeof(Font))
             {
                 return new TypeConverters.FontConverter().ConvertFromInvariantString(value);

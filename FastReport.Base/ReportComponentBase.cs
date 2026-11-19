@@ -112,6 +112,7 @@ namespace FastReport
         private string evenStyle;
         private string hoverStyle;
         private StylePriority evenStylePriority;
+        private bool pageBreak;
         private PrintOn printOn;
         private string beforePrintEvent;
         private string afterPrintEvent;
@@ -134,6 +135,7 @@ namespace FastReport
         private string mouseDownEvent;
         private string mouseEnterEvent;
         private string mouseLeaveEvent;
+        private bool isIntersectingWithOtherObject;
         #endregion
 
         #region Properties
@@ -166,6 +168,17 @@ namespace FastReport
         {
             get { return exportable; }
             set { exportable = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets a value that determines if the object is intersecting with other object.
+        /// </summary>
+        [DefaultValue(false)]
+        [Browsable(false)]
+        public bool IsIntersectingWithOtherObject
+        {
+            get { return isIntersectingWithOtherObject; }
+            set { isIntersectingWithOtherObject = value; }
         }
 
         /// <summary>
@@ -277,6 +290,7 @@ namespace FastReport
         public Hyperlink Hyperlink
         {
             get { return hyperlink; }
+            set { hyperlink = value; }
         }
 
         /// <summary>
@@ -400,6 +414,18 @@ namespace FastReport
         {
             get { return evenStylePriority; }
             set { evenStylePriority = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets a value that determines whether to insert the hard page break before processing this object.
+        /// </summary>
+        [Browsable(false)]
+        [DefaultValue(false)]
+        [Category("Behavior")]
+        public bool PageBreak
+        {
+            get { return pageBreak; }
+            set { pageBreak = value; }
         }
 
         /// <summary>
@@ -667,6 +693,7 @@ namespace FastReport
             Border = src.Border.Clone();
             Fill = src.Fill.Clone();
             Bookmark = src.Bookmark;
+            IsIntersectingWithOtherObject = src.IsIntersectingWithOtherObject;
             Hyperlink.Assign(src.Hyperlink);
             CanGrow = src.CanGrow;
             CanShrink = src.CanShrink;
@@ -676,6 +703,7 @@ namespace FastReport
             EvenStyle = src.EvenStyle;
             HoverStyle = src.HoverStyle;
             EvenStylePriority = src.EvenStylePriority;
+            PageBreak = src.PageBreak;
             PrintOn = src.PrintOn;
             BeforePrintEvent = src.BeforePrintEvent;
             AfterPrintEvent = src.AfterPrintEvent;
@@ -755,6 +783,8 @@ namespace FastReport
         {
             if (Width < 0.01 || Height < 0.01)
                 return;
+            if (DrawIntersectBackground(e))
+                return;
             Fill.Draw(e, AbsBounds);
         }
 
@@ -774,6 +804,29 @@ namespace FastReport
             RectangleF objRect = new RectangleF(AbsLeft * e.ScaleX, AbsTop * e.ScaleY,
               Width * e.ScaleX + 1, Height * e.ScaleY + 1);
             return e.Graphics.IsVisible(objRect);
+        }
+
+        /// <summary>
+        /// Validate this object.
+        /// </summary>
+        /// <returns>List of errors</returns>
+        public virtual List<ValidationError> Validate()
+        {
+            List<ValidationError> listError = new List<ValidationError>();
+
+            if (IsIntersectingWithOtherObject && !(Parent is ReportComponentBase && !Validator.RectContainInOtherRect((Parent as ReportComponentBase).AbsBounds, this.AbsBounds)))
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Warning, Res.Get("Messages,Validator,IntersectedObjects"), this));
+
+            if (Height <= 0 || Width <= 0)
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,IncorrectSize"), this));
+
+            if (Name == "")
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,UnnamedObject"), this));
+
+            if (Parent is ReportComponentBase && !Validator.RectContainInOtherRect((Parent as ReportComponentBase).AbsBounds, this.AbsBounds))
+                listError.Add(new ValidationError(Name, ValidationError.ErrorLevel.Error, Res.Get("Messages,Validator,OutOfBounds"), this));
+
+            return listError;
         }
 
         /// <inheritdoc/>
@@ -812,6 +865,8 @@ namespace FastReport
                     writer.WriteValue("EvenStylePriority", EvenStylePriority);
                 if (HoverStyle != c.HoverStyle)
                     writer.WriteStr("HoverStyle", HoverStyle);
+                if (PageBreak != c.PageBreak)
+                    writer.WriteBool("PageBreak", PageBreak);
                 if (PrintOn != c.PrintOn)
                     writer.WriteValue("PrintOn", PrintOn);
                 if (BeforePrintEvent != c.BeforePrintEvent)
@@ -984,7 +1039,12 @@ namespace FastReport
 
             if (!String.IsNullOrEmpty(ExportableExpression))
             {
-                expressions.Add(Code.CodeUtils.FixExpressionWithBrackets(ExportableExpression));
+                string expression = Code.CodeUtils.FixExpressionWithBrackets(ExportableExpression);
+                if (expression.ToLower() == "true" || expression.ToLower() == "false")
+                {
+                    expression = expression.ToLower();
+                }
+                expressions.Add(expression);
             }
 
             return expressions.ToArray();
@@ -1044,6 +1104,7 @@ namespace FastReport
             flagUseBorder = true;
             flagPreviewVisible = true;
             flagSerializeStyle = true;
+            isIntersectingWithOtherObject = false;
             shiftMode = ShiftMode.Always;
             style = "";
             evenStyle = "";

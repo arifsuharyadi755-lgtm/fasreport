@@ -1,6 +1,7 @@
 ﻿using FastReport.Utils;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.ComponentModel;
 
 namespace FastReport.Gauge.Simple.Progress
 {
@@ -21,6 +22,9 @@ namespace FastReport.Gauge.Simple.Progress
     }
 
     /// <inheritdoc />
+#if !DEBUG
+    [DesignTimeVisible(false)]
+#endif
     public class SimpleProgressPointer : SimplePointer
     {
         private SimpleProgressPointerType type;
@@ -80,8 +84,7 @@ namespace FastReport.Gauge.Simple.Progress
                 Width = widthSml;
             }
             Brush brush = Fill.CreateBrush(new RectangleF(Left, Top, Width, Height), e.ScaleX, e.ScaleY);
-            g.FillRectangle(brush, Left, Top, Width, Height);
-            g.DrawRectangle(pen, Left, Top, Width, Height);
+            g.FillAndDrawRectangle(pen, brush, Left, Top, Width, Height);
         }
 
         internal override void DrawVert(FRPaintEventArgs e)
@@ -110,8 +113,7 @@ namespace FastReport.Gauge.Simple.Progress
                 Height = heightSml;
             }
             Brush brush = Fill.CreateBrush(new RectangleF(Left, Top, Width, Height), e.ScaleX, e.ScaleY);
-            g.FillRectangle(brush, Left, Top, Width, Height);
-            g.DrawRectangle(pen, Left, Top, Width, Height);
+            g.FillAndDrawRectangle(pen, brush, Left, Top, Width, Height);
         }
 
         /// <inheritdoc />

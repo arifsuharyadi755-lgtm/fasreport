@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Reflection;
 using System.Globalization;
 using Microsoft.Win32;
@@ -36,7 +37,7 @@ namespace FastReport.Utils
                 Report.EnsureInit();
                 string folder = Config.Root.FindItem("Language").GetProp("Folder");
                 // check the registry
-#if !(NETSTANDARD2_0 || NETSTANDARD2_1)
+#if !CROSSPLATFORM
                 if (String.IsNullOrEmpty(folder) && !Config.WebMode)
                 {
                     RegistryKey key = Registry.CurrentUser.OpenSubKey("Software").OpenSubKey("FastReports");
@@ -275,7 +276,7 @@ namespace FastReport.Utils
 
         private static string Get(string id, XmlDocument locale)
         {
-            string[] categories = id.Split(new char[] { ',' });
+            string[] categories = id.Split(',');
             XmlItem xi = locale.Root;
             foreach (string category in categories)
             {
@@ -313,7 +314,7 @@ namespace FastReport.Utils
         /// </example>
         public static void Set(string id, string value)
         {
-            string[] categories = id.Split(new char[] { ',' });
+            string[] categories = id.Split(',');
             XmlItem xi = FLocale.Root;
             foreach (string category in categories)
             {

@@ -9,6 +9,7 @@ using System.IO;
 using System.Net;
 using System.Text;
 #if  !OPENSOURCE
+using FastReport.AdvMatrix;
 using FastReport.Export.Pdf;
 #endif
 
@@ -222,6 +223,7 @@ namespace FastReport.Web
                 // important container, it cuts off elements that are outside of the report page bounds
                 int pageWidth = (int)Math.Ceiling(GetReportPageWidthInPixels() * html.Zoom);
                 int pageHeight = (int)Math.Ceiling(GetReportPageHeightInPixels() * html.Zoom);
+                ReportMaxWidth = pageWidth;
                 sb.Insert(0, $@"<div style=""width:{pageWidth}px;height:{pageHeight}px;overflow:hidden;display:inline-block;"">");
                 sb.Append("</div>");
             }
@@ -283,7 +285,24 @@ namespace FastReport.Web
                             });
                     }
                 }
+                return;
             }
+
+            var advmatrix_button = request.Query["advmatrix_click"].ToString();
+            if (!advmatrix_button.IsNullOrWhiteSpace())
+            {
+                var @params = advmatrix_button.Split(',');
+                if (@params.Length == 3)
+                {
+                    if (
+                        int.TryParse(@params[1], out var pageN) &&
+                        int.TryParse(@params[2], out var index))
+                    {
+                        DoClickAdvancedMatrixByParamID(@params[0], pageN, index);
+                    }
+                }
+            }
+
         }
 
         internal void SetReportZoom(HttpRequest request)
@@ -351,10 +370,11 @@ namespace FastReport.Web
             string settab = request.Query["settab"].ToString();
             if (!settab.IsNullOrWhiteSpace())
             {
-                int i = 0;
-                if (int.TryParse(settab, out i))
+                if (int.TryParse(settab, out int i))
+                {
                     //if (i >= 0 && i < Tabs.Count)
-                    CurrentTabIndex = i;
+                    SetTab(i);
+                }
             }
 
             string closetab = request.Query["closetab"].ToString();
@@ -453,7 +473,50 @@ namespace FastReport.Web
             }
             return pageN;
         }
-
+        private void DoClickAdvancedMatrixByParamID(string objectName, int pageN, int index)
+        {
+#if !OPENSOURCE
+            if (Report.PreparedPages != null)
+            {
+                bool found = false;
+                while (pageN < Report.PreparedPages.Count && !found)
+                {
+                    ReportPage page = Report.PreparedPages.GetPage(pageN);
+                    if (page != null)
+                    {
+                        ObjectCollection allObjects = page.AllObjects;
+                        foreach (Base obj in allObjects)
+                        {
+                            if (obj is MatrixCollapseButton collapseButton)
+                            {
+                                if (collapseButton.Name == objectName
+                                    && collapseButton.Index == index)
+                                {
+                                    collapseButton.MatrixCollapseButtonClick();
+                                    Refresh(pageN, page);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            else if(obj is MatrixSortButton sortButton)
+                            {
+                                if(sortButton.Name == objectName
+                                    && sortButton.Index == index)
+                                {
+                                    sortButton.MatrixSortButtonClick();
+                                    Refresh(pageN, page);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                        page.Dispose();
+                        pageN++;
+                    }
+                }
+            }
+#endif
+        }
         private void DoClickObjectByParamID(string objectName, int pageN, float left, float top)
         {
             if (Report.PreparedPages != null)
@@ -578,7 +641,6 @@ namespace FastReport.Web
                     {
                         Name = paramValue,
                         Report = tabReport,
-                        ReportPrepared = true,
                         Closeable = true,
                         NeedParent = false
                     });
@@ -626,7 +688,6 @@ namespace FastReport.Web
                         {
                             Name = paramValue,
                             Report = tabReport,
-                            ReportPrepared = true,
                             Closeable = true,
                             NeedParent = true
                         });
@@ -714,7 +775,7 @@ namespace FastReport.Web
             }
         }
 
-        float GetReportPageWidthInPixels()
+        internal float GetReportPageWidthInPixels()
         {
             float _pageWidth = 0;
 
@@ -739,7 +800,7 @@ namespace FastReport.Web
             return _pageWidth;
         }
 
-        float GetReportPageHeightInPixels()
+        internal float GetReportPageHeightInPixels()
         {
             float _pageHeight = 0;
             if (SinglePage)

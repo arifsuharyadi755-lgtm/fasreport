@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using FastReport.Utils;
 using FastReport.Preview;
@@ -30,6 +31,7 @@ namespace FastReport.Export
         private bool shiftNonExportable;
         private string saveInitialDirectory;
         private List<Stream> generatedStreams;
+        private bool exportTabs;
         protected bool webPreview;
 
         #region Properties
@@ -160,6 +162,15 @@ namespace FastReport.Export
         }
 
         /// <summary>
+        /// Gets or sets a value indicating that pages will exporting from all open tabs.
+        /// </summary>
+        public bool ExportAllTabs
+        {
+            get { return exportTabs; }
+            set { exportTabs = value; }
+        }
+
+        /// <summary>
         /// Stream to export to.
         /// </summary>
         protected Stream Stream
@@ -264,7 +275,7 @@ namespace FastReport.Export
         {
             try
             {
-                System.Diagnostics.Process proc = new System.Diagnostics.Process();
+                Process proc = new Process();
                 proc.EnableRaisingEvents = false;
 
 #if NETCOREAPP
@@ -272,7 +283,7 @@ namespace FastReport.Export
                 proc.StartInfo.Arguments = $"/c \"{fileName}\"";
                 proc.StartInfo.CreateNoWindow = true;
 #else
-                proc.StartInfo.FileName = fileName;
+                proc.StartInfo = new ProcessStartInfo(fileName) { UseShellExecute = true };
 #endif
                 proc.Start();
             }
@@ -319,22 +330,6 @@ namespace FastReport.Export
             this.Report.OnExportParameters(new ExportParametersEventArgs(this));
         }
 
-        /*
-        /// <summary>
-        /// This method is called for each exported page. Function is DEPERCATED!!!
-        /// </summary>
-        /// <param name="pageNo">Page number to export.</param>
-        /// <remarks>
-        /// To get a page, use the following code:
-        /// <code>
-        /// ReportPage page = Report.PreparedPages.GetPage(pageNo);
-        /// </code>
-        /// </remarks>
-        protected virtual void ExportPage(int pageNo)
-        {
-            //need to delete this
-        }*/
-
         /// <summary>
         /// This method is called at the start of exports of each page.
         /// </summary>
@@ -356,9 +351,9 @@ namespace FastReport.Export
         /// This method is called for each band on exported page.
         /// </summary>
         /// <param name="band">Band, dispose after method compite.</param>
-        protected virtual void ExportBand(Base band)
+        protected virtual void ExportBand(BandBase band)
         {
-            (band as BandBase).UpdateWidth();
+            band.UpdateWidth();
         }
 
         /// <summary>
@@ -393,6 +388,7 @@ namespace FastReport.Export
             writer.WriteValue("PageRange", PageRange);
             writer.WriteStr("PageNumbers", PageNumbers);
             writer.WriteBool("OpenAfterExport", OpenAfterExport);
+            writer.WriteBool("ExportAllTabs", ExportAllTabs);
         }
 
         /// <summary>
@@ -466,6 +462,35 @@ namespace FastReport.Export
             }
         }
 
+        public void InstantExportStart(Report report, Stream stream)
+        {
+            SetReport(report);
+            this.stream = stream;
+            GeneratedFiles.Clear();
+            if (!String.IsNullOrEmpty(FileName))
+                GeneratedFiles.Add(FileName);
+            Start();
+        }
+
+        public void InstantExportBeginPage(ReportPage page)
+        {
+            ExportPageBegin(page);
+        }
+
+        public void InstantExportExportBand(BandBase band)
+        {
+            ExportBand(band);
+        }
+
+        public void InstantExportEndPage(ReportPage page)
+        {
+            ExportPageEnd(page);
+        }
+
+        public void InstantExportFinish()
+        {
+            Finish();
+        }
         internal void ExportPageNew(int pageNo)
         {
             PreparedPage ppage = Report.PreparedPages.GetPreparedPage(pageNo);
@@ -480,18 +505,19 @@ namespace FastReport.Export
                     float topShift = 0;
                     foreach (Base obj in ppage.GetPageItems(page, false))
                     {
+                        BandBase band = obj as BandBase;
                         if (shiftNonExportable && topShift != 0 && obj is BandBase &&
-                          !(obj is PageFooterBand) && !(obj as BandBase).PrintOnBottom)
+                          !(obj is PageFooterBand) && !band.PrintOnBottom)
                         {
-                            (obj as BandBase).Top -= topShift;
+                            band.Top -= topShift;
                         }
-                        if ((obj as BandBase).Exportable
+                        if (band.Exportable
                             || webPreview)
-                            ExportBand(obj);
+                            ExportBand(band);
                         else if (obj != null)
                         {
                             if (shiftNonExportable)
-                                topShift += (obj as BandBase).Height;
+                                topShift += band.Height;
                             obj.Dispose();
                         }
 
@@ -543,7 +569,8 @@ namespace FastReport.Export
             Directory.CreateDirectory(tempFolder);
             try
             {
-                Export(report, tempFolder + "/" + GetFileName(report) + GetFileExtension());
+                string filePath = Path.Combine(tempFolder, GetFileName(report) + GetFileExtension());
+                Export(report, filePath);
                 ZipArchive zip = new ZipArchive();
                 zip.AddDir(tempFolder);
                 zip.SaveToStream(stream);
@@ -567,6 +594,7 @@ namespace FastReport.Export
             allowOpenAfter = true;
             zoom = 1;
             generatedFiles = new List<string>();
+            exportTabs = false;
             shiftNonExportable = false;
         }
     }

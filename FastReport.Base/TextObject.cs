@@ -76,13 +76,17 @@ namespace FastReport
         /// <summary>
         /// Render with img tags, span etc. Experimental and unstable logic
         /// </summary>
-        HtmlParagraph
+        HtmlParagraph,
+        /// <summary>
+        /// Renders a text in a simplest way. For internal use only.
+        /// </summary>
+        Inline
     }
 
     /// <summary>
     /// The format of paragraph
     /// </summary>
-    [TypeConverterAttribute(typeof(TypeConverters.FRExpandableObjectConverter))]
+    [TypeConverter(typeof(TypeConverters.FRExpandableObjectConverter))]
     public class ParagraphFormat
     {
         private float firstLineIndent;
@@ -287,10 +291,10 @@ namespace FastReport
         private FormatBase savedFormat;
         private InlineImageCache inlineImageCache;
         private ParagraphFormat paragraphFormat;
+        private bool preserveLastLineSpace;
         #endregion
 
         #region Properties
-
 
         /// <summary>
         /// Gets or sets a paragraph format for a new html rendering type, not for others rendering
@@ -523,7 +527,13 @@ namespace FastReport
         public float FontWidthRatio
         {
             get { return fontWidthRatio; }
-            set { fontWidthRatio = value; }
+            set 
+            {                                
+                if (value > 0) 
+                    fontWidthRatio = value;
+                else
+                    fontWidthRatio = 1;
+            }
         }
 
         /// <summary>
@@ -697,6 +707,8 @@ namespace FastReport
             get { return HorzAlign == HorzAlign.Justify || Wysiwyg || LineHeight != 0 || HasHtmlTags; }
         }
 
+        internal bool PreserveLastLineSpace { get { return preserveLastLineSpace; } set { preserveLastLineSpace = value; } }
+
         /// <summary>
         /// Cache for inline images
         /// </summary>
@@ -768,13 +780,13 @@ namespace FastReport
                         return new SizeF(width, height);
                     }
                 }
-#if !(NETSTANDARD2_0 || NETSTANDARD2_1)
+#if SKIA || !CROSSPLATFORM
                 if (IsAdvancedRendererNeeded)
 #endif
                 {
                     if (width == 0)
                         width = 100000;
-                    AdvancedTextRenderer renderer = new AdvancedTextRenderer(GetDisplayText(), g, font, Brushes.Black, Pens.Black,
+                    AdvancedTextRenderer renderer = new AdvancedTextRenderer(Text, g, font, Brushes.Black, Pens.Black,
                       new RectangleF(0, 0, width, 100000), GetStringFormat(report.GraphicCache, 0),
                       HorzAlign, VertAlign, LineHeight, Angle, FontWidthRatio, false, Wysiwyg, HasHtmlTags, false, 96f / DrawUtils.ScreenDpi,
                       96f / DrawUtils.ScreenDpi, InlineImageCache);
@@ -786,12 +798,12 @@ namespace FastReport
                         height += Padding.Vertical + 1;
                     return new SizeF(width, height);
                 }
-#if !(NETSTANDARD2_0 || NETSTANDARD2_1)
+#if SKIA || !CROSSPLATFORM
                 else
                 {
                     if (FontWidthRatio != 1)
                         width /= FontWidthRatio;
-                    SizeF size = g.MeasureString(GetDisplayText(), font, new SizeF(width, 100000));
+                    SizeF size = g.MeasureString(Text, font, new SizeF(width, 100000));
                     size.Width += Padding.Horizontal + 1;
                     size.Height += Padding.Vertical + 1;
                     return size;
@@ -985,7 +997,7 @@ namespace FastReport
         {
             // fixed issue 2823
             FirstTabOffset = ParagraphOffset;
-            string[] lines = text.Split(new char[] { '\n' });
+            string[] lines = text.Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
                 if (!lines[i].StartsWith("\t"))
@@ -1115,17 +1127,43 @@ namespace FastReport
 
         internal HtmlTextRenderer GetHtmlTextRenderer(IGraphics g, float scale, float fontScale, RectangleF textRect, StringFormat format)
         {
-            return GetHtmlTextRenderer(GetDisplayText(), g, fontScale, scale, fontScale, textRect, format, false);
+            return GetHtmlTextRenderer(Text, g, fontScale, scale, fontScale, textRect, format, false);
         }
 
-        internal HtmlTextRenderer GetHtmlTextRenderer(string text, IGraphics g, float formatScale, float scale, float fontScale, RectangleF textRect, StringFormat format, bool isPrinting)
+        internal HtmlTextRenderer GetHtmlTextRenderer(string text, IGraphics g, float formatScale, float scale, float fontScale, 
+            RectangleF textRect, StringFormat format, bool isPrinting)
         {
+#if true
+            HtmlTextRenderer.RendererContext context;
+            context.text = text;
+            context.g = g;
+            context.font = font.FontFamily;
+            context.size = font.Size;
+            context.style = font.Style; // no keep
+            context.color = TextColor; // no keep
+            context.underlineColor = textOutline.Color;
+            context.rect = textRect;
+            context.underlines = Underlines;
+            context.format = format; // no keep
+            context.horzAlign = horzAlign;
+            context.vertAlign = vertAlign;
+            context.paragraphFormat = ParagraphFormat.MultipleScale(formatScale);
+            context.forceJustify = ForceJustify;
+            context.scale = scale* 96f / DrawUtils.ScreenDpi;
+            context.fontScale = fontScale * 96f / DrawUtils.ScreenDpi;
+            context.cache = InlineImageCache;
+            context.isPrinting = isPrinting;
+            context.isDifferentTabPositions = TabPositions.Count > 0;
+            context.keepLastLineSpace = this.PreserveLastLineSpace;
+            return new HtmlTextRenderer(context);
+#else
             bool isDifferentTabPositions = TabPositions.Count > 0;
             return new HtmlTextRenderer(text, g, font.FontFamily, font.Size, font.Style, TextColor,
                       textOutline.Color, textRect, Underlines,
                       format, horzAlign, vertAlign, ParagraphFormat.MultipleScale(formatScale), ForceJustify,
                       scale * 96f / DrawUtils.ScreenDpi, fontScale * 96f / DrawUtils.ScreenDpi, InlineImageCache,
                       isPrinting, isDifferentTabPositions);
+#endif
         }
 
         /// <summary>
@@ -1170,6 +1208,9 @@ namespace FastReport
                 {
                     switch (TextRenderType)
                     {
+                        case TextRenderType.Inline:
+                            g.DrawString(text, font, textBrush, textRect.X, textRect.Y, StringFormat.GenericTypographic);
+                            break;
                         case TextRenderType.HtmlParagraph:
                             try
                             {
@@ -1226,11 +1267,9 @@ namespace FastReport
                                         }
                                         else //without. default
                                         {
-                                            g.FillPath(textBrush, path);
-                                            g.DrawPath(outlinePen, path);
+                                            g.FillAndDrawPath(outlinePen, textBrush, path);
                                         }
                                         g.Restore(state);
-
 
                                     }
                                 }
@@ -1474,9 +1513,9 @@ namespace FastReport
             Visible = c.Visible;
         }
 
-        #endregion
+#endregion
 
-        #region Report Engine
+#region Report Engine
         /// <inheritdoc/>
         public override string[] GetExpressions()
         {
@@ -1485,7 +1524,7 @@ namespace FastReport
 
             if (AllowExpressions && !String.IsNullOrEmpty(Brackets))
             {
-                string[] brackets = Brackets.Split(new char[] { ',' });
+                string[] brackets = Brackets.Split(',');
                 // collect expressions found in the text
                 expressions.AddRange(CodeUtils.GetExpressions(Text, brackets[0], brackets[1]));
             }
@@ -1549,7 +1588,7 @@ namespace FastReport
             {
                 if (!String.IsNullOrEmpty(Brackets))
                 {
-                    string[] brackets = Brackets.Split(new char[] { ',' });
+                    string[] brackets = Brackets.Split(',');
                     FindTextArgs args = new FindTextArgs();
                     args.Text = new FastString(Text);
                     args.OpenBracket = brackets[0];
@@ -1558,7 +1597,7 @@ namespace FastReport
                     while (args.StartIndex < args.Text.Length)
                     {
                         string expression = CodeUtils.GetExpression(args, false);
-                        if (expression == "")
+                        if (expression == null)
                             break;
 
                         string formattedValue = CalcAndFormatExpression(expression, expressionIndex);
@@ -1705,7 +1744,7 @@ namespace FastReport
                                 }
             }
         }
-        #endregion
+#endregion
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TextObject"/> class with default settings.
@@ -1725,6 +1764,7 @@ namespace FastReport
             highlight = new ConditionCollection();
             FlagSerializeStyle = false;
             SetFlags(Flags.HasSmartTag, true);
+            preserveLastLineSpace =  false;
         }
     }
 }

@@ -97,6 +97,7 @@
     </Shapes>
     <PictureObject Text="Immagine"/>
     <TableObject Text="Tabella"/>
+    <Matrix Text="Matrice"/>
     <MatrixObject Text="Matrice"/>
     <SubreportObject Text="Subreport"/>
     <BarcodeObject Text="Cadice a barre"/>
@@ -1013,7 +1014,7 @@
       <InsertToRight Text="inserisce colonna a destra"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Unisci celle"/>
+      <Merge Text="Unisci celle"/>
       <Split Text="Dividi celle"/>
     </TableCell>
     <MatrixObject>

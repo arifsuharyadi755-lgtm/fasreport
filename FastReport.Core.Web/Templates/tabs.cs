@@ -16,13 +16,14 @@ namespace FastReport.Web
 
                 for (int i = 0; i < Tabs.Count; i++)
                 {
+
                     //sb.Append("<div class=\"tabselector\">");
-                    //sb.Append(string.Format("<input class=\"td tab {2}\" type=\"button\" name=\"tab1\" value=\"{0}\" title=\"{3}\" onclick=\"{1}\"/>",
-                    //    GetTabName(i), GetNavRequest("settab", i.ToString()), i == CurrentTabIndex ? "tabselected" : "", fTabs[i].Name));
+                    //sb.AppendFormat("<input class=\"td tab {2}\" type=\"button\" name=\"tab1\" value=\"{0}\" title=\"{3}\" onclick=\"{1}\"/>",
+                    //    GetTabName(i), GetNavRequest("settab", i.ToString()), i == CurrentTabIndex ? "tabselected" : "", fTabs[i].Name);
                     //if (ReportProperties.ShowTabCloseButton)
                     //{
-                    //    sb.Append(string.Format("<input class=\"td tabclose {2}\" type=\"button\" name=\"tab1c\" value=\"{0}\" title=\"{3}\" onclick=\"{1}\"/>",
-                    //        "X", GetNavRequest("closetab", i.ToString()), i == CurrentTabIndex ? "tabselected" : "", "X"));
+                    //    sb.AppendFormat("<input class=\"td tabclose {2}\" type=\"button\" name=\"tab1c\" value=\"{0}\" title=\"{3}\" onclick=\"{1}\"/>",
+                    //        "X", GetNavRequest("closetab", i.ToString()), i == CurrentTabIndex ? "tabselected" : "", "X");
                     //}
                     //sb.Append("</div>");
 
@@ -39,21 +40,24 @@ namespace FastReport.Web
                                          <img src=""{template_resource_url("close.svg", "image/svg+xml")}"">
                                      </a>");
 
-                    sb.Append($@"</div>");
+                    sb.Append("</div>");
                 }
-
-                sb.Append($@"</div>");
+                sb.Append("</div>");
             }
             return sb.ToString();
         }
 
         internal string GetCurrentTabName()
         {
+            if (SplitReportPagesInTabs)
+                return Report.GetReportName;
+
             return GetTabName(CurrentTabIndex);
         }
-
+      
         internal string GetTabName(int i)
         {
+
             if (String.IsNullOrEmpty(Tabs[i].Name))
             {
                 string s = Tabs[i].Report.ReportInfo.Name;
@@ -62,9 +66,11 @@ namespace FastReport.Web
                 if (String.IsNullOrEmpty(s))
                     s = (i + 1).ToString();
                 return s;
+            
             }
             else
                 return Tabs[i].Name;
         }
+
     }
 }

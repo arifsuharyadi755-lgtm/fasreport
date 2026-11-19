@@ -4,6 +4,8 @@ using System.Reflection;
 using System.Linq;
 using System.Collections.Generic;
 using System.Text;
+using System.Diagnostics;
+using Cake.Core;
 
 namespace CakeScript
 {
@@ -11,11 +13,27 @@ namespace CakeScript
     {
         static readonly Dictionary<string, string> Args = new Dictionary<string, string>();
 
-        static public void Main(string[] args)
+        private static MethodInfo targetMethod;
+
+
+        public static bool IsTargetMethod 
+        {
+            get
+            {
+                var stackTrace = new StackTrace(false);
+                var frame = stackTrace.GetFrame(1);
+                var callMethod = frame.GetMethod();
+
+                bool result = callMethod == targetMethod;
+                return result;
+            }
+        }
+
+        public static async Task Main(string[] args)
         {
             ParseArgs(args);
 
-            string target = string.Empty;
+            var target = string.Empty;
             if (Args.ContainsKey("target"))
             {
                 target = Args["target"];
@@ -23,14 +41,14 @@ namespace CakeScript
 #if DEBUG
             if(string.IsNullOrEmpty(target))
             {
-                var method = GetDebugTask();
-                if (method != null)
+                targetMethod = GetDebugTask();
+                if (targetMethod != null)
                 {
-                    var debugArgs = GetDebugArgs(method);
+                    var debugArgs = GetDebugArgs(targetMethod);
                     ParseArgs(debugArgs);
-                    var graph = Graph.CreateTree(method);
+                    var graph = Graph.CreateTree(targetMethod);
 
-                    RunTree(graph, args);
+                    await RunTree(graph, args);
                     return;
                 }
             }
@@ -38,9 +56,11 @@ namespace CakeScript
 
             if (!string.IsNullOrEmpty(target))
             {
-                var graph = Graph.CreateTree(target);
+                targetMethod = GetMethod(target);
 
-                RunTree(graph, args);
+                var graph = Graph.CreateTree(targetMethod);
+
+                await RunTree(graph, args);
             }
             else
                 Program.Default();
@@ -50,6 +70,8 @@ namespace CakeScript
         private static string[] GetDebugArgs(MethodInfo method)
         {
             var args = method.GetCustomAttribute<DebugAttribute>().Args;
+            if (string.IsNullOrEmpty(args))
+                return Array.Empty<string>();
 
             //TODO: whitespace in path, for example "path="D:/Program Files""
             return args.Split(' ');
@@ -59,6 +81,9 @@ namespace CakeScript
         {
             foreach (var argument in args)
             {
+                if (string.IsNullOrEmpty(argument))
+                    continue;
+
                 if (argument == "--tree")
                 {
                     ViewAllTasks();
@@ -67,7 +92,9 @@ namespace CakeScript
 
                 var splitted = argument.Split('=', 2);
 
-                Args.Add(splitted[0].Remove(0, 2), splitted[1]);
+                var arg = splitted[0].Remove(0, 2);
+                var value = splitted[1].Trim('"');
+                Args.Add(arg, value);
             }
         }
 
@@ -108,26 +135,39 @@ namespace CakeScript
             throw new Exception($"Method with {methodName} name wasn't found!");
         }
 
-        private static void RunTree(Graph graph, string[] args)
+        private static async Task RunTree(Graph graph, string[] args)
         {
             var sortedTasks = graph.Run();
             var prog = new Program(args);
 
             foreach (var sortedTask in sortedTasks)
             {
-                RunTaskWrapper(sortedTask, prog);
+                await RunTaskWrapper(sortedTask, prog);
             }
         }
 
-        private static void RunTaskWrapper(Graph.GraphTask sortedTask, object instance)
+        private static async Task RunTaskWrapper(Graph.GraphTask sortedTask, object instance)
         {
-            Console.WriteLine("=============================");
+            const string separator = "=============================";
+            Console.WriteLine(separator);
             Console.WriteLine($"  {sortedTask.Name}");
 
-            sortedTask.Method.Invoke(instance, Array.Empty<object>());
+            try
+            {
+                object result = sortedTask.Method.Invoke(instance, Array.Empty<object>());
+
+                if (result is Task taskResult)
+                {
+                    await taskResult.ConfigureAwait(false);
+                }
+            }
+            catch (CakeException e)
+            {
+                Environment.Exit(e.ExitCode);
+            }
 
             Information($"  {sortedTask.Name} finished", ConsoleColor.Green);
-            Console.WriteLine("=============================");
+            Console.WriteLine(separator);
             Console.WriteLine();
         }
 
@@ -139,7 +179,12 @@ namespace CakeScript
                 Console.WriteLine($"ID: {dep.Id}, VERSION: {dep.Version}, TFM: {dep.TargetFramework}");
             }
             else
-                Console.WriteLine(info.ToString());
+                Information(info.ToString());
+        }
+
+        public static void Information(string info)
+        {
+            Console.WriteLine(info);
         }
 
         public static void Information(object info, ConsoleColor color)
@@ -149,6 +194,37 @@ namespace CakeScript
             Console.ResetColor();
         }
 
+        public static void Information(string info, ConsoleColor color)
+        {
+            Console.ForegroundColor = color;
+            Information(info);
+            Console.ResetColor();
+        }
+
+        public static void Warning(object info)
+            => Information(info, ConsoleColor.Yellow);
+
+        public static void Warning(string info)
+            => Information(info, ConsoleColor.Yellow);
+
+        public static void Error(string info)
+            => Information(info, ConsoleColor.Red);
+
+        public static bool HasArgument(string argument)
+        {
+            if (Args.ContainsKey(argument))
+                return true;
+
+            return false;
+        }
+
+        public static string Argument(string argument)
+        {
+            if (Args.ContainsKey(argument))
+                return Args[argument];
+
+            throw new Exception($"Argument '{argument}' not found");
+        }
 
         public static string Argument(string argument, string defaultValue)
         {

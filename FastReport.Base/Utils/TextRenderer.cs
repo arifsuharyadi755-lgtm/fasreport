@@ -237,7 +237,7 @@ namespace FastReport.Utils
             StyleDescriptor style = new StyleDescriptor(Font.Style, BrushColor, BaseLine.Normal);
             if (HtmlTags)
                 text = text.Replace("<br>", "\r\n").Replace("<br/>", "\r\n").Replace("<br />", "\r\n");
-            string[] lines = text.Split(new char[] { '\n' });
+            string[] lines = text.Split('\n');
             int originalCharIndex = 0;
 
             foreach (string line in lines)
@@ -269,12 +269,7 @@ namespace FastReport.Utils
         private void AdjustParagraphLines()
         {
             // calculate text height
-            float height = 0;
-            height = CalcHeight();
-            /*foreach (Paragraph paragraph in Paragraphs)
-            {
-              height += paragraph.Lines.Count * LineHeight;
-            }*/
+            float height = CalcHeight();
 
             // calculate Y offset
             float offsetY = DisplayRect.Top;
@@ -565,7 +560,7 @@ namespace FastReport.Utils
                             break;
                         }
 
-                        string textFit = text.Substring(0, charsFit).TrimEnd(new char[] { ' ' });
+                        string textFit = text.Substring(0, charsFit).TrimEnd(' ');
                         lines.Add(new Line(textFit, this, originalCharIndex));
                         text = text.Substring(charsFit)
                                         // Fix for linux system
@@ -1385,7 +1380,7 @@ namespace FastReport.Utils
                 hasTabs = text.Contains("\t");
 
                 // split text by spaces
-                string[] words = text.Split(new char[] { ' ' });
+                string[] words = text.Split(' ');
                 string textWithSpaces = "";
 
                 foreach (string word in words)
@@ -1396,7 +1391,7 @@ namespace FastReport.Utils
                     {
                         // split text by tabs
                         textWithSpaces += word;
-                        string[] tabWords = textWithSpaces.Split(new char[] { '\t' });
+                        string[] tabWords = textWithSpaces.Split('\t');
 
                         foreach (string word1 in tabWords)
                         {
@@ -1568,8 +1563,7 @@ namespace FastReport.Utils
                     {
                         GraphicsPath path = new GraphicsPath();
                         path.AddString(Text, font.FontFamily, Convert.ToInt32(font.Style), Renderer.Graphics.DpiY * font.Size / 72, new PointF(Left - 1, Top - 1), Renderer.Format);
-                        Renderer.Graphics.FillPath(Renderer.Brush, path);
-                        Renderer.Graphics.DrawPath(Renderer.OutlinePen, path);
+                        Renderer.Graphics.FillAndDrawPath(Renderer.OutlinePen, Renderer.Brush, path);
                     }
 
                     if (disposeFont)
@@ -1595,6 +1589,13 @@ namespace FastReport.Utils
                 }
                 else
                 {
+#if SKIA
+                    // we need actual height of a text because it may have font fallback with different metrics
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        return DrawUtils.MeasureString(Renderer.Graphics.Graphics, text, Renderer.Font, Renderer.Format).Height;
+                    }
+#endif
                     return Renderer.LineHeight;
                 }
             }
@@ -2074,8 +2075,7 @@ namespace FastReport.Utils
             {
                 GraphicsPath path = new GraphicsPath();
                 path.AddString(text, font.FontFamily, Convert.ToInt32(font.Style), g.DpiY * font.Size / 72, rect, format);
-                g.FillPath(brush, path);
-                g.DrawPath(outlinePen, path);
+                g.FillAndDrawPath(outlinePen, brush, path);
             }
 
             g.Restore(state);

@@ -69,7 +69,7 @@ namespace FastReport.Engine
 
             try
             {
-                PrepareBand(band, getData);
+                PrepareBand(band, getData); 
 
                 if (band.Visible)
                 {
@@ -92,7 +92,7 @@ namespace FastReport.Engine
         private void ShowBandToPreparedPages(BandBase band, bool getData)
         {
             // handle "StartNewPage". Skip if it's the first row, avoid empty first page.
-            if ((band.StartNewPage && !(band.Parent is PageHeaderBand)) && band.FlagUseStartNewPage && (band.RowNo != 1 || band.FirstRowStartsNewPage) &&
+            if ((band.StartNewPage && !(band.Parent is PageHeaderBand || band.Parent is PageFooterBand)) && band.FlagUseStartNewPage && (band.RowNo != 1 || band.FirstRowStartsNewPage) &&
                 !band.Repeated)
             {
                 EndColumn();
@@ -105,7 +105,19 @@ namespace FastReport.Engine
 
                 if (band.Visible)
                 {
-                    AddToPreparedPages(band);
+                    if (BandHasHardPageBreaks(band))
+                    {
+                        foreach (var b in SplitHardPageBreaks(band))
+                        {
+                            if (b.StartNewPage)
+                                EndColumn();
+                            AddToPreparedPages(b);
+                        }
+                    }
+                    else
+                    {
+                        AddToPreparedPages(band);
+                    }
                 }
             }
             finally
@@ -215,7 +227,7 @@ namespace FastReport.Engine
             {
                 object expression = null;
                 // Calculate expressions with TotalPages only on FinalPass.
-                if (!obj.VisibleExpression.Contains("TotalPages") || FinalPass)
+                if (!obj.VisibleExpression.Contains("TotalPages") || (Report.DoublePass && FinalPass))
                 {
                     expression = Report.Calc(Code.CodeUtils.FixExpressionWithBrackets(obj.VisibleExpression));
                 }

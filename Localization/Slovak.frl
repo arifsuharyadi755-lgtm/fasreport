@@ -101,6 +101,7 @@
     </Shapes>
     <PictureObject Text="Obrázok"/>
     <TableObject Text="Tabuľka"/>
+    <Matrix Text="Matica"/>
     <MatrixObject Text="Matica"/>
     <SubreportObject Text="Podzostava"/>
     <BarcodeObject Text="Čiarový kód"/>
@@ -1347,7 +1348,7 @@
       <InsertToRight Text="Vložiť stĺpec vpravo"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Zlúčiť bunky"/>
+      <Merge Text="Zlúčiť bunky"/>
       <Split Text="Rozdeliť bunku"/>
     </TableCell>
     <MatrixObject>

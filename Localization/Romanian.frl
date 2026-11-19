@@ -101,6 +101,7 @@
     </Shapes>
     <PictureObject Text="Poza"/>
     <TableObject Text="Tabel"/>
+    <Matrix Text="Matrice"/>
     <MatrixObject Text="Matrice"/>
     <SubreportObject Text="Subraport"/>
     <BarcodeObject Text="Cod de bara"/>
@@ -1348,7 +1349,7 @@
       <InsertToRight Text="Insereaza o Coloana la Dreapta"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Uneste Celulele"/>
+      <Merge Text="Uneste Celulele"/>
       <Split Text="Imparte Celulele"/>
     </TableCell>
     <MatrixObject>

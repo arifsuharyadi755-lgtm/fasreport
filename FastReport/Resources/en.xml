@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?> 
 <Language Name="en">
   <Fonts>
     <FontMustNotBeModifiedEmbeddedOrExchanged Text="{0} font must not be modified, embedded, or exchanged in any manner without first obtaining permission of the legal owner."/>
@@ -19,9 +19,9 @@
   <Messages>
     <AccessingData Text="Accessing data..."/>
     <Attention Text="Attention"/>
-	  <BarcodeFewError Text="The number of digits is less than the permissible minimum."/>
-	  <BarcodeManyError Text="The number of digits is greater than the allowable maximum."/>
-	  <BarcodeLengthMismatch Text="Number of characters mismatch."/>
+    <BarcodeFewError Text="The number of digits is less than the permissible minimum."/>
+    <BarcodeManyError Text="The number of digits is greater than the allowable maximum."/>
+    <BarcodeLengthMismatch Text="Number of characters mismatch."/>
     <CantFindObject Text="Can't find object"/>
     <CantLoadReport Text="Can't load the report {0}"/>
     <CantSaveReport Text="Can't save the report. The file may be write-protected."/>
@@ -50,6 +50,7 @@
     <ParentError1 Text="Object of type {0} cannot contain objects"/>
     <Performance Text="Prepared in {0} ms"/>
     <PreparingData Text="Preparing data..."/>
+    <LoadingReport Text="Loading report..."/>
     <PrintingPage Text="Printing page {0}"/>
     <RenameAncestor Text="Could not rename {0}, it was introduced in the ancestor report"/>
     <SaveChanges Text="Save changes to {0}?"/>
@@ -59,6 +60,7 @@
     <TableManualBuildError Text="You can use TableObject.PrintRow, PrintColumn methods inside its ManualBuild event only."/>
     <Warning Text="Warning"/>
     <WarningSaveRDL Text="RDL format has some restrictions! This filter will save template's view only! Data sources and objects Barcode, Rich Text, CheckBox and Zip Code will not be saved! Some of properties of objects will not be saved! So you can loose some elements and properties of your template. Save however?"/>
+    <WarningMatrixOnRepeatedBand Text="It's not recommended to put {0} on {1}. The {0} in this case will be created every time when the band will be printed, which will lead to stack overflow."/>
     <WrongFileFormat Text="Cannot load the file. Unknown file format"/>
     <WrongListAndLabelFile Text="Cannot load the file. File is invalid or not a List and Label report."/>
     <WrongCrystalReportsFile Text="Cannot load the file. File is invalid or not a Crystal Reports report."/>
@@ -68,6 +70,13 @@
     <ErrorInHighlightCondition Text="Error in highlight condition"/>
     <FileNameEmpty Text="Please specify the correct file name."/>
     <SaveToAnotherFile Text="Would you like to save to another file?"/>
+    <Validator>
+      <DuplicateName Text="Name already is used."/>
+      <IntersectedObjects Text="Object is intersected with other object."/>
+      <IncorrectSize Text="Object must have sizes more than zero."/>
+      <UnnamedObject Text="Object hasn't name."/>
+      <OutOfBounds Text="Object out beyond boundaries of parent."/>
+    </Validator>
     <Swiss>
       <SwissNullIban Text="Iban must not be null"/>
       <SwissNullCreditor Text="Creditor must not be null"/>
@@ -95,6 +104,11 @@
     </Swiss>
   </Messages>
   <Misc>
+    <Bytes Text="bytes"/>
+    <KB Text="KB"/>
+    <MB Text="MB"/>
+    <GB Text="GB"/>
+    <TB Text="TB"/>
     <ShortUnitsMm Text="mm"/>
     <ShortUnitsCm Text="cm"/>
     <ShortUnitsIn Text="in"/>
@@ -116,6 +130,9 @@
     <MsSqlDataConnection Text="MS SQL connection"/>
     <OdbcDataConnection Text="ODBC connection"/>
     <FirebirdDataConnection Text="Firebird connection"/>
+    <ExcelDataConnection Text="Excel connection"/>
+    <CassandraDataConnection Text="Cassandra connection"/>
+    <LinterDataConnection Text="LINTER connection"/>
     <VistaDBDataConnection Text="VistaDB connection"/>
     <PostgresDataConnection Text="Postgres connection"/>
     <MySqlDataConnection Text="MySQL connection"/>
@@ -125,13 +142,14 @@
     <SharePointDataConnection Text="SharePoint connection"/>
     <GoogleBigQueryDataConnection Text="Google Big Query connection"/>
     <JsonDataConnection Text="JSON database"/>
-    <JsonDataSourceConnection Text="JSON (JavaScript Object Notation)" />
-    <ESDataSourceConnection Text="ElasticSearch connection" />
-	  <CouchbaseDataConnection Text="Couchbase server"/>
+    <JsonDataSourceConnection Text="JSON (JavaScript Object Notation)"/>
+    <ESDataSourceConnection Text="ElasticSearch connection"/>
+    <CouchbaseDataConnection Text="Couchbase server"/>
     <MongoDBDataConnection Text="MongoDB connection"/>
     <NosDbDataConnection Text="NosDb connection"/>
     <RavenDBDataConnection Text="RavenDB connection"/>
-	  <SqlAnywhereDataConnection Text="SqlAnywhere connection"/>
+    <SqlAnywhereDataConnection Text="SqlAnywhere connection"/>
+    <ClickHouseDataConnection Text="ClickHouse connection"/>
     <Bands Text="Bands">
       <ReportTitle Text="Report Title"/>
       <ReportSummary Text="Report Summary"/>
@@ -168,7 +186,9 @@
     <PictureObject Text="Picture"/>
     <SVGObject Text="SVG Document"/>
     <TableObject Text="Table"/>
+    <Matrix Text="Matrix"/>
     <MatrixObject Text="Matrix"/>
+    <AdvMatrixObject Text="Advanced Matrix"/>
     <SubreportObject Text="Subreport"/>
     <ContainerObject Text="Container"/>
     <BarcodeObject Text="Barcode"/>
@@ -260,6 +280,7 @@
     <CrossViewObject Text="CrossView"/>
     <DigitalSignatureObject Text="Digital signature"/>
     <FastBI Text="FastReport Business Graphics">
+      <Bubble Text="Bubble chart"/>
       <TreeMap Text="TreeMap chart"/>
       <Sunburst Text="Sunburst chart"/>
       <Icicle Text="Icicle chart"/>
@@ -282,6 +303,7 @@
         <IcicleDirection Text="Direction"/>
         <SunburstForm Text="Sunburst editor form"/>
         <IcicleForm Text="Icicle editor form"/>
+        <BubbleForm Text="Bubble editor form"/>
         <TreeMapForm Text="TreeMap editor form"/>
       </Appearance>
     </FastBI>    
@@ -303,6 +325,7 @@
     <XsdFile Text="XML schema definition file (*.xsd)|*.xsd"/>
     <XmlFile Text="XML file (*.xml)|*.xml"/>
     <MdbFile Text="MS Access database (*.mdb)|*.mdb"/>
+    <AccdbFile Text="MS Access 2007 database (*.accdb)|*.accdb"/>
     <MdfFile Text="Microsoft SQL Server databases (*.mdf)|*.mdf"/>
     <RtfFile Text="Rich Text file (*.rtf)|*.rtf"/>
     <Images Text="Image files|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tiff;*.tif;*.ico;*.emf;*.wmf"/>
@@ -341,6 +364,8 @@
     <XpsFile Text="XPS file (*.xps)|*.xps"/>
     <RdlFiles Text="RDL files (*.rdl;*.rdlc)|*.rdl;*.rdlc"/>
     <RdlFile Text="RDL file (*.rdl)|*.rdl"/>
+    <StimulSoftFile Text="StimulSoft file (*.mrt)|*.mrt"/>
+    <JasperReportsFile Text="JasperReports file (*.jrxml)|*.jrxml"/>
     <RdlcFile Text="RDLC file (*.rdlc)|*.rdlc"/>
     <RptFile Text="Crystal Reports file (*.rpt)|*.rpt"/>
     <ShpFile Text="ESRI shapefile (*.shp)|*.shp"/>
@@ -413,6 +438,7 @@
         <Close Text="Close"/>
         <Save Text="Save"/>
         <SaveAs Text="Save As..."/>
+        <SaveWithRandomData Text="Save With Random Data..."/>
         <SaveAll Text="Save All"/>
         <PageSetup Text="Page Setup..."/>
         <PrinterSetup Text="Printer Setup..."/>
@@ -464,6 +490,7 @@
       </Window>
       <Help Text="Help">
         <Contents Text="Help Contents..."/>
+        <Account Text="Account..."/>
         <About Text="About..."/>
       </Help>
     </Menu>
@@ -475,6 +502,11 @@
         <EventsTab Text="Events"/>
         <NObjectsSelected Text="{0} objects selected"/>
       </Properties>
+      <Validator Text="Validation">
+        <Name Text="Name"/>
+        <Message Text="Message"/>
+        <Updating Text="Updating"/>
+      </Validator>
       <ReportTree Text="Report Tree"/>
       <CollapseAll Text="Collapse all"/>
       <ExpandAll Text="Expand all"/>
@@ -747,6 +779,46 @@
       <Color Text="Color:"/>
       <Hint Text="Choose the line style and choose the line to apply the style."/>
     </Border>
+    <CISWizardForm Text="Wizard for visualization of control (identification) signs">
+      <CIS Text="Сontrol (identification) sign"/>
+      <ProductGroup Text="Product group:"/>
+      <Data Text="Encoded data:"/>
+      <TypeBarcodes Text="Type of barcodes:"/>
+      <LeftMargin Text="Left margin"/>
+      <MethodСirculation Text="Method of release of products into circulation:"/>
+      <Country Text="Country:"/>
+      <ID Text="ID:"/>
+      <Size Text="Size:"/>
+      <PageProps Text="Page properties"/>
+      <Landscape Text="Landscape"/>
+      <MarginTop Text="Top:"/>
+      <MarginLeft Text="Left:"/>
+      <Margins Text="Margins:"/>
+      <Paper Text="Paper type:"/>
+      <PageWidth Text="Page width:"/>
+      <PageHeight Text="Page height:"/>
+      <CountColumns Text="Count columns:"/>
+      <CountRows Text="Count rows:"/>
+      <HorizontalPadding Text="Horizontal margin:"/>
+      <VerticalPadding Text="Vertical margin:"/>
+      <Border Text="Borders of sign"/>
+      <TransportPack Text="Tobacco, Transport packaging"/>
+      <Pack Text="Tobacco, Pack"/>
+      <Block Text="Tobacco, Block"/>
+      <Legprom Text="Light industry"/>
+      <Perfumes Text="Perfumes and eau de toilette"/>
+      <Footwear Text="Footwear"/>
+      <Fur Text="Fur coats"/>
+      <Photo Text="Photo"/>
+      <Tires Text="Tires"/>
+      <Medicines Text="Medicines"/>
+      <Dairy Text="Dairy products"/>
+      <Water Text="Packaged water"/>
+      <ImportProd Text="Import of products into the customs territory"/>
+      <ManufactureProd Text="Manufacture of products on the territory"/>
+      <Sample Text="Sample"/>
+      <Warning Text="Sings do not fit on the page!"/>
+    </CISWizardForm>
     <ChartEditor Text="Chart Editor">
       <Chart Text="Chart"/>
       <Add Text="Add..."/>
@@ -1050,6 +1122,9 @@
       <CSharp Text="C#"/>
       <VBNet Text="Visual Basic .NET"/>
     </CodePageOptions>
+    <FRXPageOptions Text="FRX page">
+      <Enable Text="Enable"/>
+    </FRXPageOptions>
     <ConfigureBands Text="Configure Bands">
       <Add Text="Add"/>
       <Delete Text="Delete"/>
@@ -1119,7 +1194,7 @@
       <Expressions Text="Expressions"/>
       <Add Text="Add"/>
       <Delete Text="Delete"/>
-      <Edit Text="Edit"/>      
+      <Edit Text="Edit"/>
     </ExpressionsEditor>
     <Fill Text="Fill Editor">
       <Solid Text="Solid"/>
@@ -1251,7 +1326,7 @@
       <HintReportPage Text="Specified page will be generated and opened in separate preview tab."/>
       <HintCustom Text="You should create &quot;Click&quot; event handler to define custom action."/>
       <ModifyAppearance Text="Modify the object's appearance so it will look like a clickable link"/>
-	  <OpenLinkInNewTab Text="Open link in new tab" />
+      <OpenLinkInNewTab Text="Open link in new tab" />
     </HyperlinkEditor>
     <LabelWizard Text="Label Wizard">
       <Hint Text="Select one of the predefined labels, or press &quot;Custom label...&quot; button to define own label size."/>
@@ -1602,6 +1677,12 @@
       <Note Text="Note: changes made will take effect on FastReport restart."/>
       <Fonts Text="Fonts"/>
       <ExportsEditor Text="Exports Menu"/>
+      <Version Text="Version:"/>
+      <Path Text="Path:"/>
+      <Date Text="Date created:"/>
+      <CompanyName Text="Company name:"/>
+      <Description Text="Description:"/>
+      <Size Text="Size:"/>
     </PluginsOptions>
     <PreviewPageSetup>
       <Apply Text="Apply to all pages and rebuild report"/>
@@ -1726,6 +1807,7 @@
       <Note Text="Note: if you change the language, entire script will be cleared!"/>
       <RefAssemblies Text="Referenced assemblies:"/>
       <Add Text="Add..."/>
+      <Remove Text="Remove"/>
       <Password Text="Password:"/>
       <RetypePassword Text="Retype password:"/>
       <Inherited Text="This report is inherited from base report:"/>
@@ -1745,8 +1827,8 @@
       <QualityRegular Text="Regular"/>
       <QualityClearType Text="ClearType"/>
       <QualityAntiAlias Text="AntiAlias"/>
-	  <QualitySingleBPP Text="SingleBPP"/>
-	  <QualitySingleBPPGridFit Text="SingleBPPGridFit"/>
+      <QualitySingleBPP Text="SingleBPP"/>
+      <QualitySingleBPPGridFit Text="SingleBPPGridFit"/>
       <PasswordError Text="Password does not match. Please retype again."/>
       <Recipients Text="Recipient(s) (for example, john@url.com):"/>
       <Subject Text="Subject:"/>
@@ -1770,11 +1852,13 @@
       <Structure Text="Structure"/>
       <Classic Text="Classic"/>
       <EditAfterInsert Text="Edit after insert"/>
-      <EventBandIndicator Text="Show indicator on bands with events" />
-      <EventObjectIndicator Text="Show indicator on objects with events" />
+      <EventBandIndicator Text="Show indicator on bands with events"/>
+      <EventObjectIndicator Text="Show indicator on objects with events"/>
+      <EnableBacklightIntersectingObjects Text="Backlight intersecting objects"/>
       <ObjectsAppearance Text="Objects appearance"/>
       <EnableBacklight Text="Backlight active band"/>
       <SimplifyDBFields Text="Simplified display of DB fields"/>
+      <DisableLastFormatting Text="Disable using of last formatting settings"/>
     </ReportPageOptions>
     <RichTextEditor Text="RichText Editor">
       <Open Text="Open"/>
@@ -1855,12 +1939,12 @@
       <WordWrap Text="Word wrap"/>
       <ConfirmChanges Text="Text has been modified. Save changes?"/>
     </TextEditor>
-    <JsonEditor Text="Json Editor"> 
+    <JsonEditor Text="Json Editor">
       <Readonly Text="(readonly)"/>
       <Open Text="Open file"/>
       <Save Text="Save file"/>
       <FormatJson Text="Format JSON"/>
-      <Filter Text="json files (*.json)|*.json|txt files (*.txt)|*.txt|All files (*.*)|*.*"/>	
+      <Filter Text="json files (*.json)|*.json|txt files (*.txt)|*.txt|All files (*.*)|*.*"/>
     </JsonEditor>
     <TotalEditor Text="Edit Total">
       <TotalName Text="Total name:"/>
@@ -1983,68 +2067,68 @@
         <AlternativeProcedure2 Text="Alternative procedure 2"/>
         <Amount Text="Amount"/>
       </Swiss>
-	  <SberbankQr>
-	    <Name Text="Beneficiary's name"/>
-		<PersonalAcc Text="Beneficiary account number"/>
-		<BankName Text="Beneficiary bank name"/>
-		<BIC Text="BIC"/>
-		<CorrespAcc Text="Correspondent account"/>
-		<Sum Text="Payment Amount"/>
-		<Purpose Text="Payment purpose"/>
-		<PayeeINN Text="Payee INN"/>
-		<PayerINN Text="Payer INN"/>
-		<DrawerStatus Text="Drafter status"/>
-		<KPP Text="Payee KPP"/>
-		<CBC Text="CBC"/>
-		<OKTMO Text="OKTMO"/>
-		<PayReason Text="Tax basis for payment"/>
-		<TaxPeriod Text="Tax period"/>
-		<DocNo Text="Document №"/>
-		<DocDate Text="Document date"/>
-		<TaxPaytKind Text="Payment type"/>
-		<LastName Text="Payer's last name"/>
-		<FirstName Text="Payer's first name"/>
-		<MiddleName Text="Payer's middle name"/>
-		<PayerAdress Text="Payer's address"/>
-		<PersonalAccount Text="Payee's personal account"/>
-		<DocIdx Text="Index of payment document"/>
-		<PensAcc Text="Account number in the PFR [Pension Fund of the Russian Federation] - SNILS [Personal insurance policy number] system"/>
-		<Contract Text="Contract number"/>
-		<PersAcc Text="Account number in the organization 
-		(metering device accounting system)"/>
-		<Flat Text="Apartment number"/>
-		<Phone Text="Phone numbmer"/>
-		<PayerIdType Text="Payee's identifying document type"/>
-		<PayerIdNum Text="Payee's identifying document number"/>
-		<ChildFio Text="Child's full name"/>
-		<BirthDate Text="Birth date"/>
-		<PaymTerm Text="The billing date/Instalment due"/>
-		<PaymPeriod Text="Payment period"/>
-		<Category Text="Payment type"/>
-		<ServiceName Text="Service name / Metering device name"/>
-		<CounterId Text="Metering device ID"/>
-		<CounterVal Text="Metering device reading"/>
-		<QuittId Text="Notice, accrual, invoice ID"/>
-		<QuittDate Text="Notice/accrual/invoice/act date 
-		(for GIBDD [The State Traffic Safety Inspectorate])"/>
-		<InstNum Text="Facility (medical, educational) number"/>
-		<ClassNum Text="Kindergarten group / school grade"/>
-		<SpecFio Text="Full name of the service providing specialist (teacher)"/>
-		<AddAmount Text="Insurance sum/additional service/fine"/>
-		<RuleId Text="Act number (for GIBDD)"/>
-		<ExecId Text="Enforcement proceeding ID"/>
-		<RegType Text="Payment type code 
-		(for example, for Rosreestr payments)"/>
-		<UIN Text="Money transfer ID"/>
-		<TechCode Text="Technical code, recommended to be filled by the service provider. 
-		Can be used by the receiving organization in a data processing system."/>
-		<ObligatoryProps Text="Obligatory details"/>
-		<AdditionalProps Text="Additional details"/>
-		<AnotherProps Text="Other details"/>
-		<NotEnterDate Text="Don't enter date"/>
-      <Error Text="Not all the required banking details are filled in."/>
-      <Warning Text="Incorrect data in the fields:"/>
-	  </SberbankQr>
+      <SberbankQr>
+        <Name Text="Beneficiary's name"/>
+        <PersonalAcc Text="Beneficiary account number"/>
+        <BankName Text="Beneficiary bank name"/>
+        <BIC Text="BIC"/>
+        <CorrespAcc Text="Correspondent account"/>
+        <Sum Text="Payment Amount"/>
+        <Purpose Text="Payment purpose"/>
+        <PayeeINN Text="Payee INN"/>
+        <PayerINN Text="Payer INN"/>
+        <DrawerStatus Text="Drafter status"/>
+        <KPP Text="Payee KPP"/>
+        <CBC Text="CBC"/>
+        <OKTMO Text="OKTMO"/>
+        <PayReason Text="Tax basis for payment"/>
+        <TaxPeriod Text="Tax period"/>
+        <DocNo Text="Document №"/>
+        <DocDate Text="Document date"/>
+        <TaxPaytKind Text="Payment type"/>
+        <LastName Text="Payer's last name"/>
+        <FirstName Text="Payer's first name"/>
+        <MiddleName Text="Payer's middle name"/>
+        <PayerAdress Text="Payer's address"/>
+        <PersonalAccount Text="Payee's personal account"/>
+        <DocIdx Text="Index of payment document"/>
+        <PensAcc Text="Account number in the PFR [Pension Fund of the Russian Federation] - SNILS [Personal insurance policy number] system"/>
+        <Contract Text="Contract number"/>
+        <PersAcc Text="Account number in the organization 
+		    (metering device accounting system)"/>
+        <Flat Text="Apartment number"/>
+        <Phone Text="Phone numbmer"/>
+        <PayerIdType Text="Payee's identifying document type"/>
+        <PayerIdNum Text="Payee's identifying document number"/>
+        <ChildFio Text="Child's full name"/>
+        <BirthDate Text="Birth date"/>
+        <PaymTerm Text="The billing date/Instalment due"/>
+        <PaymPeriod Text="Payment period"/>
+        <Category Text="Payment type"/>
+        <ServiceName Text="Service name / Metering device name"/>
+        <CounterId Text="Metering device ID"/>
+        <CounterVal Text="Metering device reading"/>
+        <QuittId Text="Notice, accrual, invoice ID"/>
+        <QuittDate Text="Notice/accrual/invoice/act date 
+		    (for GIBDD [The State Traffic Safety Inspectorate])"/>
+        <InstNum Text="Facility (medical, educational) number"/>
+        <ClassNum Text="Kindergarten group / school grade"/>
+        <SpecFio Text="Full name of the service providing specialist (teacher)"/>
+        <AddAmount Text="Insurance sum/additional service/fine"/>
+        <RuleId Text="Act number (for GIBDD)"/>
+        <ExecId Text="Enforcement proceeding ID"/>
+        <RegType Text="Payment type code 
+		    (for example, for Rosreestr payments)"/>
+        <UIN Text="Money transfer ID"/>
+        <TechCode Text="Technical code, recommended to be filled by the service provider. 
+		    Can be used by the receiving organization in a data processing system."/>
+        <ObligatoryProps Text="Obligatory details"/>
+        <AdditionalProps Text="Additional details"/>
+        <AnotherProps Text="Other details"/>
+        <NotEnterDate Text="Don't enter date"/>
+        <Error Text="Not all the required banking details are filled in."/>
+        <Warning Text="Incorrect data in the fields:"/>
+      </SberbankQr>
     </BarcodeEditor>
     <SavingPageOptions Text="Saving">
       <EnableAutoSave Text="Enable auto save every (minutes)"/>
@@ -2066,6 +2150,68 @@
       <Columns Text="Columns"/>
       <Rows Text="Rows"/>
     </FastM1nesweeper>
+    <AccountWindow Text="Account">
+      <WebBrowser Text="Authentication"/>
+      <Title Text="Account"/>
+      <SignIn Text="Sign In"/>
+      <NoAccount Text="No account?"/>
+      <Create Text="Create one!"/>
+      <Intro Text="Sign in to your Fast Reports ID account. Your account will be used to synchronize your settings between devices and for other personalization services."/>
+      <Testing Text="&#10;&#10;This feature is in beta!"/>
+      <Expires Text="Expires at {0}"/>
+      <Profile Text="Profile"/>
+      <SignOut Text="Sign Out"/>
+      <Message Text="Your account is used to sync your settings between devices and for other personalization services."/>
+      <SessionExpired Text="Session expired, sign in again!"/>
+    </AccountWindow>
+    <ServerWindow Text="Server">
+      <Server Text="Server"/>
+      <Caption Text="Server"/>
+      <ApiKeyword Text="Api key" />
+      <comboBoxServer Text="FastReport Cloud"/>
+      <comboBoxText Text="https://fastreport.cloud"/>
+      <comboBoxCustom Text="Custom server"/>
+    </ServerWindow>
+    <AdvMatrixHeaderEditor Text="Header Editor">
+      <General Text="General">
+        <ItemType Text="Item type:"/>
+        <Simple Text="Simple"/>
+        <Group Text="Group"/>
+        <DisplayText Text="Display text:"/>
+      </General>
+      <Sort Text="Sort">
+        <SortOrder Text="Sort order:"/>
+        <SortBy Text="Sort by:"/>
+        <ItemValue Text="Item value"/>
+        <TotalValue Text="Total value:"/>
+        <InteractiveSortBy Text="Interactive sort by:"/>
+        <SortOrderToggledBy Text="Sort order toggled by:"/>
+        <Auto Text="Auto"/>
+      </Sort>
+      <Filter Text="Filter">
+        <Filter Text="Filter:"/>
+      </Filter>
+      <TopN Text="Top N">
+        <Count Text="Display Top N values:"/>
+        <AdditionalItems Text="Additional items:"/>
+        <TopNTotal Text="Top N total"/>
+        <Others Text="Others"/>
+        <OthersTotal Text="Others total"/>
+        <Create Text="Create additional items in the matrix template for better customization"/>
+      </TopN>
+      <Visibility Text="Visibility">
+        <Visible Text="Visible"/>
+        <VisibleExpression Text="Visibility is set by an expression:"/>
+        <VisibleToggledBy Text="Visible toggled by:"/>
+      </Visibility>
+      <Other Text="Other">
+        <Stepped Text="Stepped layout"/>
+        <Merge Text="Merge with single subitem"/>
+        <PageBreak Text="Page break"/>
+        <ColSpan Text="Column span (0 for auto):"/>
+        <RowSpan Text="Row span (0 for auto):"/>
+      </Other>
+    </AdvMatrixHeaderEditor>
   </Forms>
   <ConnectionEditors>
     <Common>
@@ -2084,6 +2230,11 @@
       <UseSql Text="Use SQL Server Authentication"/>
       <SavePassword Text="Save my password"/>
     </MsSql>
+    <Cassandra>
+      <ContactPoints Text="ContactPoints(;):"/>
+      <Port Text="Port:"/>
+      <Keyspace Text="Keyspace:"/>
+    </Cassandra>
     <OleDb>
       <ConnectionString Text="Connection string:"/>
       <Build Text="Build..."/>
@@ -2098,6 +2249,10 @@
       <Xsd Text="Schema file or URL:"/>
       <Xml Text="Data file or URL:"/>
     </Xml>
+    <Access>
+      <Provider Text="Provider:"/>
+    </Access>
+    <Xlsx Text="Select .xlsx file:"/>
     <Csv>
       <ConfigureDatabase Text="Configure database"/>
       <SelectFile Text="Select .csv file (path or url):"/>
@@ -2138,6 +2293,7 @@
       <HeaderKey Text="Header"/>
       <HeaderVal Text="Value"/>
       <ConfirmChanges Text="Json has been modified. Generate a new schema?" />
+      <SimpleStructure Text="Simple structure"/>
     </Json>
     <MongoDB>
       <Scheme Text="Scheme:"/>
@@ -2145,6 +2301,11 @@
       <Port Text="Port:"/>
       <UseSsl Text="Use SSL"/>
     </MongoDB>
+    <Clickhouse>
+      <Server Text="Server"/>
+      <ServerPort Text="Server port:"/>
+      <Database Text="Database"/>
+    </Clickhouse>
   </ConnectionEditors>
   <ComponentMenu>
     <Component>
@@ -2214,7 +2375,7 @@
       <InsertToRight Text="Insert Column to Right"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Join Cells"/>
+      <Merge Text="Merge Cells"/>
       <Split Text="Split Cell"/>
     </TableCell>
     <MatrixObject>
@@ -2232,6 +2393,57 @@
       <PercentRowTotal Text="% of Row Total"/>
       <PercentGrandTotal Text="% of Grand Total"/>
     </MatrixCell>
+    <AdvMatrixObject>
+      <Style Text="Style"/>
+      <Swap Text="Swap columns and rows"/>
+    </AdvMatrixObject>
+    <AdvMatrixCell>
+      <Function Text="Function">
+        <Sum Text="Sum"/>
+        <Min Text="Min"/>
+        <Max Text="Max"/>
+        <Avg Text="Average"/>
+        <Count Text="Count"/>
+        <CountDistinct Text="Count distinct values"/>
+        <StDev Text="Standard deviation (StDev)"/>
+        <StDevP Text="Standard deviation of a population (StDevP)"/>
+        <Var Text="Variance (Var)"/>
+        <VarP Text="Variance of a population (VarP)"/>
+        <First Text="First value"/>
+        <Last Text="Last value"/>
+        <ValuesList Text="Values list"/>
+      </Function>
+      <Percent Text="Percent">
+        <None Text="None"/>
+        <PercentOfColumnTotal Text="% of Column Total"/>
+        <PercentOfRowTotal Text="% of Row Total"/>
+        <PercentOfGrandTotal Text="% of Grand Total"/>
+        <PercentOfPreviousColumn Text="% of Previous Column"/>
+        <PercentOfPreviousRow Text="% of Previous Row"/>
+      </Percent>
+      <Insert Text="Insert">
+        <Chart Text="Sparkline"/>
+        <Gauge Text="Progress gauge"/>
+      </Insert>
+      <AggregateFunctions Text="Aggregate functions"/>
+      <SpecialFunctions Text="Special functions"/>
+      <Properties Text="Properties"/>
+    </AdvMatrixCell>
+    <AdvMatrixHeader>
+      <CollapseButton Text="Collapse button"/>
+      <SortButton Text="Sort button"/>
+      <AddTotal Text="Add total"/>
+      <Insert Text="Insert new item">
+        <After Text="After"/>
+        <Before Text="Before"/>
+        <Parent Text="Parent item"/>
+        <Child Text="Child item"/>
+      </Insert>
+      <Delete Text="Delete">
+        <ThisItem Text="Selected item"/>
+        <ItemTree Text="Item tree"/>
+      </Delete>
+    </AdvMatrixHeader>
     <GridControl>
       <EditColumns Text="Edit Columns..."/>
     </GridControl>
@@ -2309,6 +2521,9 @@
       <BlueOrange Text="Blue and Orange"/>
       <OrangeWhite Text="Orange and White"/>
     </Matrix>
+    <AdvMatrix>
+      <NewItems Text="Drag data here to create columns, rows and cells"/>
+    </AdvMatrix>
     <Map>
       <Hint Text="Doubleclick to add layers.&#13;&#10;&#13;&#10;Use left mouse button to pan, mouse wheel to zoom."/>
     </Map>
@@ -2325,6 +2540,7 @@
     <NewDataSource Text="New Data Source"/>
     <NewPage Text="New Report Page"/>
     <NewDialog Text="New Dialog Form"/>
+    <CISWizard Text="Visualization wizard of control (identification) signs"/>
     <FastM1nesweeper Text="Fast M1nesweeper"/>
   </Wizards>
   <Export>
@@ -2334,6 +2550,7 @@
       <AnalyzeObjects Text="Analyze objects"/>
       <SavePage Text="Save page"/>
       <Wysiwyg Text="Wysiwyg"/>
+      <UseFileStream Text="Use file stream"/>
       <PageBreaks Text="Page breaks"/>
       <OpenAfterExport Text="Open after export"/>
       <Pictures Text="Pictures"/>
@@ -2347,11 +2564,14 @@
       <Seamless Text="Seamless table"/>
       <ToMultipleFiles Text="Export to multiple files"/>
       <PrintOptimized Text="Print Optimized"/>
-	  <SplitPages Text="Split Pages"/>
+      <ExportAllTabs Text="Export all tabs"/>
+      <SplitPages Text="Split Pages"/>
+      <Localization Text="Locale export"/>
+      <UseDesigerLocale Text="Use designer locale"/>
     </Misc>
     <Editor Text="Exports Menu Editor">
-        <ExportsMenu Text="Exports Menu"/>
-        <DefaultMenu Text="Default Menu"/>
+      <ExportsMenu Text="Exports Menu"/>
+      <DefaultMenu Text="Default Menu"/>
     </Editor>
     <ExportGroups>
       <Office Text="Office"/>
@@ -2426,6 +2646,7 @@
       <Default Text="Default"/>
       <OEM Text="OEM"/>
       <DataOnly Text="Data only"/>
+      <ExportType Text="Export types of data"/>
       <FieldNames Text="Field names (for example, Field1;Field2):"/>
     </Dbf>
     <Xml Text="Export to XML">
@@ -2449,6 +2670,23 @@
       <FitAllColumsOnOnePage Text="Fit All Colums on One Page" />
       <FitAllRowsOnOnePage Text="Fit All Rows on One Page" />
       <GroupOnSeparateSheet Text="Groups on separate sheets"/>
+      <PictureProperties Text="Pictures properties"/>
+      <MoveAndModify Text="Move and modify along with the cell."/>
+      <MoveOnly Text="Move but not resize."/>
+      <Unchangeable Text="Do not move or resize."/>
+      <ScaleInPercent Text="Set scale in percent:"/>
+      <PinnedCells Text="Pinned cells"/>
+      <WithoutPinning Text="Without pinning"/>
+      <FirstColumn Text="First column"/>
+      <FirstLine Text="First line"/>
+      <OtherPinning Text="Other Pinning"/>
+      <Columns Text="Columns:"/>
+      <Rows Text="Rows:"/>
+      <Basic Text="Basic"/>
+      <Other Text="Other"/>
+      <ShowGridlines Text="Show gridlines"/>
+      <UseLocaleFormating Text="Use locale formatting of data"/>
+      <CurrencyToAccounting Text="Convert currency to accounting format"/>
     </Xlsx>
     <Xls Text="Export to Excel 97">
       <File Text="Excel 97 file"/>
@@ -2572,8 +2810,10 @@
       <SubFolder Text="Sub-folder"/>
       <Navigator Text="Navigator"/>
       <Layers Text="Layers"/>
+      <HighQualitySVG Text="High quality SVG"/>
       <EmbPic Text="Embedding pictures"/>
       <Total Text="Total"/>
+      <NotRotateLandscapePage Text="Don't rotate landscape pages when printing"/>
       <First Text="&lt;&lt;"/>
       <Last Text="&gt;&gt;"/>
       <Prev Text="&lt;"/>
@@ -2594,12 +2834,14 @@
       <Density Text="Density"/>
       <FontScale Text="Font Scale"/>
       <PrintAsBitmap Text="Print As Bitmap"/>
+      <Version Text="Version of ZPL"/>
     </Zpl>
     <Email Text="Send E-mail">
       <Email Text="E-mail"/>
       <Account Text="Account"/>
       <Address Text="Address:"/>
       <CC Text="CC:"/>
+      <CCTooltip Text="You can enter multiple addresses by separating them with a semicolon.&#13;&#10;For example: name1@url.com; name2@url.com"/>
       <Subject Text="Subject:"/>
       <Message Text="Message:"/>
       <Attachment Text="Attachment:"/>
@@ -2614,6 +2856,7 @@
       <HostError Text="Host cannot be empty."/>
       <SendingEmail Text="Sending email - {0} Kb"/>
       <EnableSSL Text="Enable SSL"/>
+      <NameAttachmentFile Text="Name attachment file:"/>
     </Email>
     <Dxf Text="Export to DXF">
       <File Text="DXF file"/>

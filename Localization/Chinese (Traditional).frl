@@ -97,6 +97,7 @@
     </Shapes>
     <PictureObject Text="圖片"/>
     <TableObject Text="表格"/>
+    <Matrix Text="交叉表"/>
     <MatrixObject Text="交叉表"/>
     <SubreportObject Text="子報表"/>
     <BarcodeObject Text="條碼"/>
@@ -1300,7 +1301,7 @@
       <InsertToRight Text="右邊插入列"/>
     </TableColumn>
     <TableCell>
-      <Join Text="合併儲存格"/>
+      <Merge Text="合併儲存格"/>
       <Split Text="分割儲存格"/>
     </TableCell>
     <MatrixObject>

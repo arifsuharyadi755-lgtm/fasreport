@@ -108,6 +108,7 @@
     </Shapes>
     <PictureObject Text="Kép"/>
     <TableObject Text="Táblázat"/>
+    <Matrix Text="Mátrix"/>
     <MatrixObject Text="Mátrix"/>
     <SubreportObject Text="Alriport"/>
     <BarcodeObject Text="Vonalkód"/>
@@ -1500,7 +1501,7 @@
       <InsertToRight Text="Oszlop Beszurás Jobbra"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Cellák Összevonása"/>
+      <Merge Text="Cellák Összevonása"/>
       <Split Text="Cellák Felosztása"/>
     </TableCell>
     <MatrixObject>

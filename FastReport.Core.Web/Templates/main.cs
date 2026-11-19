@@ -15,7 +15,7 @@ namespace FastReport.Web
         {
             return $@"
 <div class=""{template_FR}-container"">
-
+   
     <style>
         {template_style()}
     </style>
@@ -23,13 +23,16 @@ namespace FastReport.Web
     <script>
         {template_script()}
     </script>
-
     <div class=""{template_FR}-spinner"" {(renderBody ? @"style=""display:none""" : "")}>
         <img src=""{template_resource_url("spinner.svg", "image/svg+xml")}"">
     </div>
-        {template_toolbar(renderBody)}
-        {template_body(renderBody)}
-</div>";
+
+    {template_toolbar(renderBody)}
+
+    {template_body(renderBody)}
+     
+{(Toolbar.Exports.EnableSettings ? template_modalcontainer() : "")}
+ ";
         }
     }
 }

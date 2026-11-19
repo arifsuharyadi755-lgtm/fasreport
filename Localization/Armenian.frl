@@ -110,6 +110,7 @@
     </Shapes>
     <PictureObject Text="Նկար"/>
     <TableObject Text="Աղյուսակ"/>
+    <Matrix Text="Մատրիցա"/>
     <MatrixObject Text="Մատրիցա"/>
     <SubreportObject Text="Ենթահաշվետվություն"/>
     <BarcodeObject Text="Բարկոդ"/>
@@ -1692,7 +1693,7 @@
       <InsertToRight Text="Ներմուծել աջակողմյա սյունակ"/>
     </TableColumn>
     <TableCell>
-      <Join Text="Միացնել սյունակները"/>
+      <Merge Text="Միացնել սյունակները"/>
       <Split Text="Բաժանել սյունակները"/>
     </TableCell>
     <MatrixObject>

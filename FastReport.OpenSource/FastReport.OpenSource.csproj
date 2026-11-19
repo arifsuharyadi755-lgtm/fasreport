@@ -39,6 +39,9 @@ Various report objects will allow your report to look exactly how you want it to
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!--See https://devblogs.microsoft.com/dotnet/producing-packages-with-source-link/#deterministic-builds -->
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -48,6 +51,10 @@ Various report objects will allow your report to look exactly how you want it to
     <DefineConstants>$(DefineConstants);DEBUG;</DefineConstants>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)'!='net40'">
+    <DefineConstants>$(DefineConstants);CROSSPLATFORM</DefineConstants>
+  </PropertyGroup>
+
   <!--readonly struct's feature-->
   <PropertyGroup Condition="'$(MSBuildVersion)' >= '16'">
     <DefineConstants>$(DefineConstants);READONLY_STRUCTS</DefineConstants>
@@ -55,13 +62,13 @@ Various report objects will allow your report to look exactly how you want it to
 
   <!--Source Link-->
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
   </ItemGroup>
 
   <!--Import version-info of referenced packages-->
   <Import Project="..\UsedPackages.version" />
   
-  <ItemGroup Condition="'$(TargetFramework)'=='netstandard2.1' OR '$(TargetFramework)'=='netstandard2.0'">
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)'=='.NETStandard'">
     <PackageReference Include="System.Security.Permissions" Version="$(SystemSecurityPermissionsVersion)" />
     <PackageReference Include="System.Drawing.Common" Version="$(SystemDrawingCommonVersion)" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="$(SystemSecurityCryptographyPkcsVersion)" />

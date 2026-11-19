@@ -181,7 +181,7 @@ namespace FastReport
 
             if (AllowExpressions && !String.IsNullOrEmpty(Brackets))
             {
-                string[] brackets = Brackets.Split(new char[] { ',' });
+                string[] brackets = Brackets.Split(',');
                 // collect expressions found in the text
                 expressions.AddRange(CodeUtils.GetExpressions(Text, brackets[0], brackets[1]));
             }
@@ -228,7 +228,7 @@ namespace FastReport
             {
                 if (!String.IsNullOrEmpty(Brackets))
                 {
-                    string[] brackets = Brackets.Split(new char[] { ',' });
+                    string[] brackets = Brackets.Split(',');
                     FindTextArgs args = new FindTextArgs();
                     args.Text = new FastString(Text);
                     args.OpenBracket = brackets[0];
@@ -238,7 +238,7 @@ namespace FastReport
                     while (args.StartIndex < args.Text.Length)
                     {
                         string expression = CodeUtils.GetExpression(args, false);
-                        if (expression == "")
+                        if (expression == null)
                             break;
 
                         string formattedValue = CalcAndFormatExpression(expression, expressionIndex);

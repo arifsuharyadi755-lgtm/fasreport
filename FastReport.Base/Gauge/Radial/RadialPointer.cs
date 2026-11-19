@@ -8,6 +8,9 @@ namespace FastReport.Gauge.Radial
     /// <summary>
     /// Represents a linear pointer.
     /// </summary>
+#if !DEBUG
+    [DesignTimeVisible(false)]
+#endif
     public class RadialPointer : GaugePointer
     {
         #region Fields
@@ -160,11 +163,9 @@ namespace FastReport.Gauge.Radial
             path.AddLines(p);
             path.AddLine(p[3], p[0]);
 
-            g.FillEllipse(brush, pointerCircle);
-            g.DrawEllipse(pen, pointerCircle);
+            g.FillAndDrawEllipse(pen, brush, pointerCircle);
 
-            g.FillPath(brush, path);
-            g.DrawPath(pen, path);
+            g.FillAndDrawPath(pen, brush, path);
         }
 
         #endregion // Private Methods
